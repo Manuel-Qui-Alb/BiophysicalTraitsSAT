@@ -1,0 +1,31 @@
+name: geo310
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  # Core scientific
+  - numpy
+  - pandas
+  - xarray
+  - dask
+  - netCDF4
+  - bottleneck
+  - matplotlib
+  - jupyterlab
+  # Geospatial stack
+  - gdal
+  - rasterio
+  - fiona
+  - geopandas
+  - shapely
+  - pyproj
+  - rtree
+  - libspatialindex
+  # Radiative transfer
+  - py6s
+  - pip
+  - pip:
+      - rioxarray
+      - "pypro4sail @ git+https://github.com/hectornieto/pypro4sail.git"
+      - "pyTSEB @ git+https://github.com/hectornieto/pyTSEB.git"
+      - oslo.concurrency
