@@ -65,8 +65,8 @@ def get_diffuse_radiation_6S(aot, wvp, sza, saa, date,
     s.geometry.solar_a = saa
     s.geometry.view_z = 0
     s.geometry.view_a = 0
-    s.geometry.day = date.day
-    s.geometry.month = date.month
+    s.geometry.day = int(date.day)
+    s.geometry.month = int(date.month)
 
     s.altitudes.set_target_custom_altitude(altitude)
     s.wavelength = sixs.Wavelength(0.4, 2.5)
