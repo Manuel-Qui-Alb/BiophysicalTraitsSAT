@@ -54,7 +54,7 @@ class ImageCollection:
         vector = gpd.read_file(self.vector).to_crs(images.rio.crs)
 
         band_stats = [reduce_regions(col=images, band=XX, vector=vector)
-                      .rename(columns={'mean': XX, 'std': '{}_std'.format(XX)})
+                      .rename(columns={'mean': XX, 'count': '{}_count'.format(XX)})
                       for XX in band]
 
         band_stats = reduce(lambda left, right: pd.merge(left, right, on=['block', 'id']), band_stats)
@@ -85,11 +85,13 @@ def reduce_regions(col, band, vector):
     for i, row in vector.iterrows():
         geom = gpd.GeoDataFrame(geometry=[row.geometry], crs=vector.crs)
         clip_i = col.rio.clip(geom.geometry, geom.crs, drop=True, all_touched=False)
+        clip_i = clip_i.where(clip_i != 9999)
         stats_i = {
             "block": row.block,
             'id': clip_i["id"].values, # or row["your_id_field"]
+            'id_vector': i,
             "mean": clip_i.mean(("y", "x"), skipna=True).values,
-            "std": clip_i.std(("y", "x"), skipna=True).values,
+            "count": clip_i.count(("y", "x")).values,
         }
         results.append(stats_i)
 

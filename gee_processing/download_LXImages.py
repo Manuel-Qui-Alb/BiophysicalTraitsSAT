@@ -16,8 +16,8 @@ crs = 'EPSG:32610'
 vector_dic = {
     'RIP720': {
         'vector': ee.FeatureCollection('projects/saw-ucdavis/assets/RIP_720'),
-        'first_date': '2018-01-01',
-        'last_date': '2020-12-31'
+        'first_date': '2019-01-01',
+        'last_date': '2019-12-31'
     },
     'BLS': {
         'vector': ee.FeatureCollection('projects/saw-ucdavis/assets/BLS'),
@@ -29,7 +29,7 @@ vector = vector_dic[farm]['vector']
 first_date = vector_dic[farm]['first_date']
 last_date = vector_dic[farm]['last_date']
 
-out_images = rf"C:\Users\mqalborn\Desktop\ET_3SEB\satellite\{farm}/L08/RHO"
+out_images = rf"C:\Users\mqalborn\Desktop\ET_3SEB\satellite\{farm}/L08/TRAD"
 out_metadata = rf"C:\Users\mqalborn\Desktop\ET_3SEB\satellite\{farm}/L08/RHO/METADATA.csv"
 
 centroid = vector.geometry().centroid().getInfo()['coordinates']
@@ -39,8 +39,8 @@ lat = centroid[1]
 # Load ImageCollection from Google Earth Engine
 LX = (gee.Landsat(farm=farm, aoi=vector)
       .filter_date(first_date, last_date))
-
-LX.percentage_pixel_free_clouds(band='SR_B4', scale=30, crs='EPSG:4326')
+# LX.thermal_to_k()
+LX.percentage_pixel_free_clouds(band='ST_B10', scale=30, crs='EPSG:4326')
 
 LX.filter_by_feature(filter='gte',
                      name='percentage_pixel_free_clouds',
@@ -58,7 +58,7 @@ pd_metadata = pd.DataFrame({'overpass_solar_time': overpass_solar_time,
                             'SZA': 90 - np.array(SEA),
                             'VZA': 0})
 
-pd_metadata.to_csv(out_metadata)
+# pd_metadata.to_csv(out_metadata)
 
 
 # data_stats['overpass_solar_time'] = data_stats['system:time_start'].map(
@@ -69,7 +69,8 @@ pd_metadata.to_csv(out_metadata)
 # ZENITH_ANGLE
 
 geemap.ee_export_image_collection(
-    LX.gee_image_collection.select('SR.*'),
+    # LX.gee_image_collection.select('SR.*'),
+    LX.gee_image_collection.select('ST_B10'),
     scale=30,
     region=LX.aoi.geometry(),
     out_dir=out_images,
@@ -77,5 +78,5 @@ geemap.ee_export_image_collection(
 #
 
 print('Processing AOT and WVP data from MCD19A2')
-get_AOT_WVP_MODIS.run_process(farm)
+# get_AOT_WVP_MODIS.run_process(farm)
 

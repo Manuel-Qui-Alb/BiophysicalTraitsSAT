@@ -158,6 +158,12 @@ def maskLXClouds(image):
     return image.updateMask(cloudState.And(cloudShadowState).And(waterState))
 
 
+def applyScaleFactorsL089(image):
+  opticalBands = image.select('SR_B.').multiply(0.0000275).add(-0.2)
+  thermalBands = image.select('ST_B.*').multiply(0.00341802).add(149.0)
+  return image.addBands(opticalBands, None, True).addBands(thermalBands, None, True)
+
+
 class Landsat(ImageCollection):
     def __init__(self, farm, aoi):
         self.available_dates = None
@@ -170,7 +176,7 @@ class Landsat(ImageCollection):
         l9 = ee.ImageCollection('LANDSAT/LC09/C02/T1_L2')
 
         # Combine the two collections using the `merge()` function.
-        lx = l8.merge(l9)
+        lx = l8.merge(l9).map(applyScaleFactorsL089)
 
         col = (lx.filterBounds(aoi)
                # .mosaic()
