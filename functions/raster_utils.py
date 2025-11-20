@@ -88,6 +88,7 @@ def reduce_regions(col, band, vector):
         clip_i = clip_i.where(clip_i != 9999)
         stats_i = {
             "block": row.block,
+            "B": row.B,
             'id': clip_i["id"].values, # or row["your_id_field"]
             'id_vector': i,
             "mean": clip_i.mean(("y", "x"), skipna=True).values,

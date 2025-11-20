@@ -26,7 +26,7 @@ def e_T(T):
     ---------
     es : Saturation vapor pressure [kPa]
     """
-    T = T- 273.15
+    T = T - 273.15
     A = 0.611
     B = 17.502
     C = 240.97

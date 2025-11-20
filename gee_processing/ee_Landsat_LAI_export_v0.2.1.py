@@ -83,8 +83,8 @@ vector_dic = {
         'folder_id': 'projects/saw-ucdavis/assets/LAI_LANDSAT_RIP720',
         'PATH': 43,
         'ROW': 34,
-        'first_date': '2019-05-01',
-        'last_date': '2019-08-31',
+        'first_date': '2019-01-01',
+        'last_date': '2020-01-01',
         'out_dir': rf'C:\Users\mqalborn\Desktop\ET_3SEB\satellite\RIP720\L08/LAI_TRAD'
     },
     'BLS': {
@@ -559,7 +559,7 @@ def main(argv):
         thermal_band = landsat_image.select([thermal_band_name[sensor_full]], ['TRAD'])
         thermalBands = thermal_band.select('TRAD').multiply(0.00341802).add(149.0)
 
-        laiScaled = laiImage.select(['LAI']).divide(1000)
+        laiScaled = laiImage.select(['LAI'])
         laiScaled.copyProperties(laiImage)
         # laiImage = laiImage.addBands(laiImage.select(['LAI']).multiply(0.01), 'LAI_reescale')
         laiScaled = laiScaled.addBands(thermalBands,None, True)
