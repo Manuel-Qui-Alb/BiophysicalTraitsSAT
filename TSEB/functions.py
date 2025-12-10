@@ -17,10 +17,9 @@ def get_emiss_rho_tau(list_ref):
     rho_nir_soil = np.full(var_shape, 0.25)
 
     z0_soil = np.full(var_shape, 0.01)
-    leaf_width = np.full(var_shape, 0.1)
 
     return (emis_leaf, emis_soil, rho_vis_leaf, tau_vis_leaf, rho_nir_leaf, tau_nir_leaf, rho_vis_soil,
-            rho_nir_soil, z0_soil, leaf_width)
+            rho_nir_soil, z0_soil)
 
 
 def estimate_Kbe(x_LAD, sza):
@@ -46,7 +45,7 @@ def estimate_Kbe(x_LAD, sza):
     return K_be
 
 
-def estimate_omega0(LAI, fv, x_LAD, sza):
+def nadir_clumpling_index_Kustas_Norman(LAI, fv, x_LAD, sza):
     """
     Estimate the clumpling index from Campbell and Norman (1998) and Parry (2019).
 
@@ -65,7 +64,7 @@ def estimate_omega0(LAI, fv, x_LAD, sza):
     Returns
     -------
     float
-        Extinction coefficient for direct beam radiation (dimensionless).
+        Omega0: Nadir clumping index (dimensionless).
     """
 
     ### Calculating Clumping Index
@@ -73,8 +72,106 @@ def estimate_omega0(LAI, fv, x_LAD, sza):
 
     # Calculate the gap fraction of our canopy
     f_gap = np.exp(-K_be * LAI)
+    f_gap = np.where(np.abs(f_gap) < 1e-6, 1e-6, f_gap)
     omega0 = np.log((1 - fv) + (fv * f_gap)) / - (K_be * LAI)
+    omega0 = np.clip(omega0, 0.05, 2)
     return omega0
+
+
+def off_nadir_clumpling_index_Kustas_Norman(LAI, fv, h_V, w_V, x_LAD, sza):
+    """
+    Estimate the off nadir clumpling index from Campbell and Norman (1998) and Parry (2019).
+
+    Parameters
+    ----------
+    LAI : float
+        Leaf Area Index.
+    fv : float
+        Fractional Vegetation Cover.
+    h_V: float
+        Vegetation Height.
+    w_V: float
+        Vegetation width.
+    x_LAD : float
+        Ellipsoidal leaf angle distribution parameter (dimensionless).
+        x = 1 for spherical LAD, x < 1 for more vertical leaves,
+        and x > 1 for more horizontal leaves.
+    sza : float
+        Solar zenith angle in radians.
+    Returns
+    -------
+    float
+        Omega: Off-Nadir clumping index (dimensionless).
+    """
+    omega0 = nadir_clumpling_index_Kustas_Norman(LAI, fv, x_LAD, sza)
+
+    D = np.clip(h_V / w_V, 1.0, 3.34)
+    p = 3.80 - 0.46 * D
+
+    omega = omega0 / (omega0 + (1 - omega0) * np.exp(-2.2 * sza ** p))
+    omega = np.clip(omega, 0.05, 2)
+    return omega
+
+
+def rectangular_row_clumping_index_parry(LAI, fv0, w_V, h_V, sza, saa, row_azimuth, hb_V=0, L=None, x_LAD=1 ):
+    """
+    Estimate the off nadir clumpling index from Campbell and Norman (1998) and Parry (2019).
+
+    Parameters
+    ----------
+    LAI : float
+        Leaf Area Index.
+    f_V0:
+        Apparent nadir fractional cover
+    w_V: float
+        Vegetation width.
+    h_V: float
+        Vegetation Height.
+    hb_V: float
+        The height of the first living branch.
+    L: float
+        row separation (m)
+    x_LAD : float
+        Ellipsoidal leaf angle distribution parameter (dimensionless).
+        x = 1 for spherical LAD, x < 1 for more vertical leaves,
+        and x > 1 for more horizontal leaves.
+    sza : float
+        Solar zenith angle in radians.
+    saa : float
+        Solar Azimuth angle in radians
+    row_azimuth : float
+        row azimuth angle in radians
+    phi : float
+        relative azimuth angle between the incident beam and the row direction (radians)
+        row direction - solar azimuth
+
+    Returns
+    -------
+    float
+        Omega: Off-Nadir clumping index (dimensionless).
+    """
+
+    phi = saa - row_azimuth
+
+    K_be = estimate_Kbe(x_LAD, sza)
+
+    # Solar canopy view factor f_sc(theta, phi) Eq. 15
+    alpha = np.tan(sza) * np.abs(np.sin(phi))
+
+    try:
+        f_sc = (w_V + (h_V - hb_V) * alpha) / L
+    except:
+        f_sc = fv0 * (1 + ( (h_V - hb_V) * alpha ) / w_V )
+
+    f_sc = np.clip(f_sc, 0.0, 1.0)
+
+    # The gep fraction of the real-world canopy Eq 13.
+    gap_phi = f_sc * np.exp(-K_be * LAI) + (1 - f_sc)
+    gap_phi = np.clip(gap_phi, 0, 1.0)
+
+    omega_row = -np.log(gap_phi) / (K_be * LAI)
+    omega_row = np.clip(omega_row, 0.05, 2)
+    return omega_row
 
 
 def estimate_f_theta(LAI, x_LAD, omega, sza, vza=0):
@@ -104,6 +201,7 @@ def estimate_f_theta(LAI, x_LAD, omega, sza, vza=0):
 
     # omega0 = calculate_omega0(LAI, fv, x_LAD, theta_s)
     f_theta = 1 - np.exp( (-K_be * omega * LAI) / np.cos(vza))
+    f_theta = np.clip(f_theta, 0.01, 1)
     return f_theta
 
 
@@ -207,14 +305,14 @@ def estimate_Rn(S_dn, sza, LAI, Trad_S, Trad_V,
     # sn_soil[~np.isfinite(sn_soil)] = 0
 
     Ln = rad.calc_longwave_irradiance(ea, Tair, p=P_atm, z_T=2.0, h_C=2.0)
-    Ln_V, Ln_S = rad.calc_L_n_Campbell(Trad_V, Trad_S, Ln, LAI, emis_leaf, emis_soil, x_LAD=x_LAD)
+    Ln_V, Ln_S = rad.calc_L_n_Campbell(Trad_V, Trad_S, Ln, LAI_eff, emis_leaf, emis_soil, x_LAD=x_LAD)
 
     Rn_V = Sn_V + Ln_V
     Rn_S = Sn_S + Ln_S
     return Rn_V, Rn_S
 
 
-def Priestly_Tayloy_LE_V(fv_g, Rn_V, alpha_PT, Tair, P_atm, c_p):
+def Priestly_Taylor_LE_V(fv_g, Rn_V, alpha_PT, Tair, P_atm, c_p):
     # slope of the saturation pressure curve (kPa./deg C)
     s = met.calc_delta_vapor_pressure(Tair)
     s = s * 10  # to mb

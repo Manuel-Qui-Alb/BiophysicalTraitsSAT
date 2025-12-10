@@ -10,7 +10,7 @@ import glob
 import get_AOT_WVP_MODIS
 
 
-farm = 'RIP720'
+farm = 'OAKVILLE'
 crs = 'EPSG:32610'
 
 vector_dic = {
@@ -22,7 +22,12 @@ vector_dic = {
     'BLS': {
         'vector': ee.FeatureCollection('projects/saw-ucdavis/assets/BLS'),
         'first_date': '2024-01-01',
-        'last_date': '2025-12-31'}
+        'last_date': '2025-12-31'},
+    'OAKVILLE': {
+        'vector': ee.FeatureCollection('projects/saw-ucdavis/assets/OAKVILLE_sectors'),
+        'first_date': '2025-06-01',
+        'last_date': '2025-08-31'
+}
 }
 
 vector = vector_dic[farm]['vector']
