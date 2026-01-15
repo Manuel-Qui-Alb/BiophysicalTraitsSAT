@@ -42,6 +42,7 @@ def estimate_Kbe(x_LAD, sza):
         Extinction coefficient for direct beam radiation (dimensionless).
     """
     K_be = np.sqrt(x_LAD ** 2 + np.tan(sza) ** 2) / (x_LAD + 1.774 * (x_LAD + 1.182) ** -0.733)
+    K_be = np.clip(K_be, 1e-6, None)
     return K_be
 
 
@@ -66,6 +67,8 @@ def nadir_clumpling_index_Kustas_Norman(LAI, fv, x_LAD, sza):
     float
         Omega0: Nadir clumping index (dimensionless).
     """
+    LAI = np.clip(LAI, 1e-6, None)
+    fv = np.clip(fv, 0.0, 1.0)
 
     ### Calculating Clumping Index
     K_be = estimate_Kbe(x_LAD, sza)
@@ -73,7 +76,10 @@ def nadir_clumpling_index_Kustas_Norman(LAI, fv, x_LAD, sza):
     # Calculate the gap fraction of our canopy
     f_gap = np.exp(-K_be * LAI)
     f_gap = np.where(np.abs(f_gap) < 1e-6, 1e-6, f_gap)
-    omega0 = np.log((1 - fv) + (fv * f_gap)) / - (K_be * LAI)
+
+    log_arg = (1.0 - fv) + (fv * f_gap)
+    log_arg = np.clip(log_arg, 1e-12, None)
+    omega0 = np.log(log_arg) / -(K_be * LAI)
     omega0 = np.clip(omega0, 0.05, 2)
     return omega0
 
@@ -309,6 +315,9 @@ def estimate_Rn(S_dn, sza, LAI, Trad_S, Trad_V,
 
     Rn_V = Sn_V + Ln_V
     Rn_S = Sn_S + Ln_S
+
+    # Rn_V = np.array(np.clip(Rn_V, -150, S_dn + Ln))
+    # Rn_S = np.array(np.clip(Rn_S, -150, S_dn + Ln))
     return Rn_V, Rn_S
 
 
