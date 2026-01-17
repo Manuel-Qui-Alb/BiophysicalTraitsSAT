@@ -2,6 +2,7 @@ import pyTSEB.TSEB as TSEB
 from pyTSEB import net_radiation as rad
 import numpy as np
 import pyTSEB.meteo_utils as met
+import warnings
 
 
 def get_emiss_rho_tau(list_ref):
@@ -222,13 +223,27 @@ def estimate_Trad_S(Trad, Trad_V, f_theta):
     Trad_V : float
         Radiometric Vegetation Temperature in Kelvin.
     f_theta : float
-        Cfraction of incident beam radiation intercepted by the plant at view zenith angle (θ)
+        fraction of incident beam radiation intercepted by the plant at view zenith angle (θ)
     Returns
     -------
     float
         Extinction coefficient for direct beam radiation (dimensionless).
     """
-    Trad_S = ((Trad ** 4 - f_theta * Trad_V ** 4) / (1 - f_theta)) ** (1 / 4)
+    # --- Radiative consistency check ---
+    Trad_V_f = (Trad_V ** 4) * f_theta
+    Trad_4 = (Trad ** 4)
+
+    invalid_rad = Trad_V_f > Trad_4
+
+    if np.any(invalid_rad):
+        warnings.warn(
+            "Radiative inconsistency detected: Trad_V > Trad "
+            "leading to negative term in Trad_S estimation. "
+            "Setting Trad_S = NaN for these cases.",
+            RuntimeWarning
+        )
+
+    Trad_S = ((Trad_4 - Trad_V_f) / (1 - f_theta)) ** (1 / 4)
     return Trad_S
 
 
@@ -333,3 +348,70 @@ def Priestly_Taylor_LE_V(fv_g, Rn_V, alpha_PT, Tair, P_atm, c_p):
     LE_V = Rn_V * alpha_PT * fv_g * s_gama
     return LE_V
 
+
+def g_S_monteith_1995(LAI, fv_g, Rn, G, Rn_V, Rn_S, Tair, R_A, R_x, R_S, P_atm, ea, VPD, g_M, El_M, f_t=1):
+    """
+    Leaf stomatal conductance by its relationship with VPD
+    following Kustas et al., 2022: https://link.springer.com/article/10.1007/s00271-022-00778-y
+    Parameters
+    ----------
+    LAI : float
+        Leaf Area Index.
+    fv_g: float
+        fraction of vegetation that is green and hence transpiring
+    VPD : float
+        Vapour pressure deficit.
+    P_atm : float
+        total air pressure (dry air + water vapour) (mb).
+    ea : float
+        water vapor pressure at reference height above canopy (mb).
+    T_A_K : float
+        air temperature at reference height (Kelvin).
+
+    g_M : float
+        maximum stomata conductance.
+    El_M : float
+        Maximum rate of leaf transpiration.
+    f_t: int
+        Stomatao distribution in the leaves.
+        1 for hypostomatous
+        2 for amphistomatous leaves
+    Returns
+    -------
+    float
+        Estimated net radiation (W m-2).
+
+    """
+
+    g_S  = g_M / (1 + g_M * VPD / El_M) # EQUATION 3 Kustas et al. 2022: Leaf stomatal conductance
+    R_C = 1 / (f_t * fv_g * LAI * g_S) # EQUATION 4 Kustas et al. 2022: Canopy Resisteance
+
+    # slope of the saturation pressure curve (kPa./deg C)
+    s = met.calc_delta_vapor_pressure(Tair)
+    s = s * 10  # to mb
+    rho = met.calc_rho(P_atm, ea, Tair)
+    c_p = 1013 #specific heat of air (assumed constant at 1013 J kg−1 K−1)
+
+    # psychrometric constant (mb C-1)
+    # latent heat of vaporisation (J./kg)
+    Lambda = met.calc_lambda(Tair)
+    gamma = met.calc_psicr(c_p, P_atm, Lambda)
+
+    PM_C_num = s * (Rn - G) + (rho * c_p * VPD - s * R_x * (Rn_S - G)) / (R_A + R_x) # EQUATION 9a Kustas et al. 2022
+    PM_C_den = s + gamma * (1.0 + R_C / (R_A + R_x)) # EQUATION 9a Kustas et al. 2022
+    PM_C = PM_C_num / PM_C_den # EQUATION 9a Kustas et al. 2022
+
+    PM_S_num = (
+        s * (Rn - G)
+        + (rho * c_p * VPD - s * R_S * Rn_V) / (R_A + R_S)
+    ) # EQUATION 9b Kustas et al. 2022
+    PM_S_den = s + gamma * (1.0 + r_ss / (R_A + R_S)) # EQUATION 9b Kustas et al. 2022
+    PM_S = PM_S_den / PM_S_num # EQUATION 9b Kustas et al. 2022
+
+    LE = C_C * PM_C + C_S * PM_S # EQUATION 8 Kustas et al. 2022
+
+    VPD0_pre = ( s * (Rn - G) - (s + gamma) * LE ) / rho * c_p # EQUATION 7 Kustas et al. 2022
+    VPD0 = VPD + R_A * VPD0_pre # EQUATION 7 Kustas et al. 2022
+
+    LE_C = (s * Rn_V + rho * c_p * VPD0) / (s + gamma (1 + R_C / R_x)) # EQUATION 6 Kustas et al. 2022
+    return LE_C

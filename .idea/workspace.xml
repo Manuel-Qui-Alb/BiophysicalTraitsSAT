@@ -5,16 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="eb90ce6c-f203-49d1-a695-676ebfb5f362" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/TSEB/myTSEB_sensitivity_analysis_C&amp;NH.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/TSEB/visualization.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/TSEB/visualize_TSEB_SA.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/stations/test.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/BiophysicalTraitsSAT.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/BiophysicalTraitsSAT.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/TSEB/my3SEB.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TSEB/functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/TSEB/functions.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TSEB/myTSEB_sensitivity_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/TSEB/myTSEB_sensitivity_analysis_C&amp;NR.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TSEB/visualization.py" beforeDir="false" afterPath="$PROJECT_DIR$/TSEB/visualization.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TSEB/myTSEB_sensitivity_analysis_C&amp;NH.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/TSEB/myTSEB_sensitivity_analysis_C&amp;NR.py" beforeDir="false" afterPath="$PROJECT_DIR$/TSEB/myTSEB_PT_sensitivity_analysis_C&amp;NR.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TSEB/visualize_TSEB_SA.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/TSEB/visualize_TSEB_SA.ipynb" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -54,74 +50,75 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python tests.Doctests in base.executor": "Run",
-    "Python tests.Doctests in generic.executor": "Debug",
-    "Python.BIOPHYSICAL_TRAITS_RTM.executor": "Run",
-    "Python.BIOPHYSICAL_TRAITS_RTM_S2.executor": "Run",
-    "Python.FAPAR_sensitivity_analysis_vis.executor": "Run",
-    "Python.FAPAR_sensitivity_model.executor": "Debug",
-    "Python.LAI2200.executor": "Run",
-    "Python.LAI_L0X_GEE.executor": "Run",
-    "Python.LAI_get_from_file.executor": "Debug",
-    "Python.PROSAIL_LAI_EXAMPLE.executor": "Run",
-    "Python.PROSAIL_parameterization.executor": "Run",
-    "Python.S2BT_PROSAIIL.executor": "Debug",
-    "Python.S2BT_PROSAIL_WORKSHOP.executor": "Run",
-    "Python.S2_reflectance_analysis.executor": "Run",
-    "Python.S2_vegetation_index.executor": "Run",
-    "Python.biophysical.executor": "Debug",
-    "Python.comparison_pyTSEB_myTSEB.executor": "Run",
-    "Python.developer.executor": "Debug",
-    "Python.download_LAILXImages.executor": "Run",
-    "Python.download_LXImages.executor": "Run",
-    "Python.download_MCD19A2.executor": "Run",
-    "Python.download_S2images.executor": "Run",
-    "Python.download_images.executor": "Run",
-    "Python.download_meteorological.executor": "Run",
-    "Python.ee_Landsat_LAI_export_v0.2.1.executor": "Run",
-    "Python.geometry.executor": "Debug",
-    "Python.get_AOT_WVP_MODIS.executor": "Run",
-    "Python.get_reflectance_S2.executor": "Debug",
-    "Python.get_stats.executor": "Run",
-    "Python.get_stats_L0X.executor": "Run",
-    "Python.get_stats_LAIRIP.executor": "Run",
-    "Python.get_stats_images.executor": "Run",
-    "Python.inputs_creator.executor": "Run",
-    "Python.metadata_landsat.executor": "Run",
-    "Python.myTSEB_sensitivity_analysis.executor": "Run",
-    "Python.myTSEB_sensitivity_analysis_C&NH.executor": "Run",
-    "Python.myTSEB_sensitivity_analysis_C&NR.executor": "Run",
-    "Python.pyTSEB_analysis.executor": "Run",
-    "Python.raster_utils.executor": "Debug",
-    "Python.sensitivity_analisys_2.executor": "Run",
-    "Python.sensitivity_analysis.executor": "Run",
-    "Python.spectral_signature_S2SRF.executor": "Run",
-    "Python.temperature_partitioning.executor": "Debug",
-    "Python.test.executor": "Run",
-    "Python.tseb.executor": "Run",
-    "Python.validation_IRTM.executor": "Run",
-    "Python.validation_LAI.executor": "Run",
-    "Python.visualization.executor": "Run",
-    "Python.visualization_LAI_TRAD_RIP720.executor": "Run",
-    "Python.wavelenght_simulation_PROSAIL.executor": "Run",
-    "Python.wavelenght_simulation_PROSAIL_Sentinel2.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "C:/Users/mqalborn/Desktop/BiophysicalTraitsSAT",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.keymap",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python tests.Doctests in base.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Doctests in generic.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.BIOPHYSICAL_TRAITS_RTM.executor&quot;: &quot;Run&quot;,
+    &quot;Python.BIOPHYSICAL_TRAITS_RTM_S2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.FAPAR_sensitivity_analysis_vis.executor&quot;: &quot;Run&quot;,
+    &quot;Python.FAPAR_sensitivity_model.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.LAI2200.executor&quot;: &quot;Run&quot;,
+    &quot;Python.LAI_L0X_GEE.executor&quot;: &quot;Run&quot;,
+    &quot;Python.LAI_get_from_file.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.PROSAIL_LAI_EXAMPLE.executor&quot;: &quot;Run&quot;,
+    &quot;Python.PROSAIL_parameterization.executor&quot;: &quot;Run&quot;,
+    &quot;Python.S2BT_PROSAIIL.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.S2BT_PROSAIL_WORKSHOP.executor&quot;: &quot;Run&quot;,
+    &quot;Python.S2_reflectance_analysis.executor&quot;: &quot;Run&quot;,
+    &quot;Python.S2_vegetation_index.executor&quot;: &quot;Run&quot;,
+    &quot;Python.biophysical.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.comparison_pyTSEB_myTSEB.executor&quot;: &quot;Run&quot;,
+    &quot;Python.developer.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.download_LAILXImages.executor&quot;: &quot;Run&quot;,
+    &quot;Python.download_LXImages.executor&quot;: &quot;Run&quot;,
+    &quot;Python.download_MCD19A2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.download_S2images.executor&quot;: &quot;Run&quot;,
+    &quot;Python.download_images.executor&quot;: &quot;Run&quot;,
+    &quot;Python.download_meteorological.executor&quot;: &quot;Run&quot;,
+    &quot;Python.ee_Landsat_LAI_export_v0.2.1.executor&quot;: &quot;Run&quot;,
+    &quot;Python.geometry.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.get_AOT_WVP_MODIS.executor&quot;: &quot;Run&quot;,
+    &quot;Python.get_reflectance_S2.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.get_stats.executor&quot;: &quot;Run&quot;,
+    &quot;Python.get_stats_L0X.executor&quot;: &quot;Run&quot;,
+    &quot;Python.get_stats_LAIRIP.executor&quot;: &quot;Run&quot;,
+    &quot;Python.get_stats_images.executor&quot;: &quot;Run&quot;,
+    &quot;Python.inputs_creator.executor&quot;: &quot;Run&quot;,
+    &quot;Python.metadata_landsat.executor&quot;: &quot;Run&quot;,
+    &quot;Python.myTSEB_PT_sensitivity_analysis_C&amp;NR.executor&quot;: &quot;Run&quot;,
+    &quot;Python.myTSEB_sensitivity_analysis.executor&quot;: &quot;Run&quot;,
+    &quot;Python.myTSEB_sensitivity_analysis_C&amp;NH.executor&quot;: &quot;Run&quot;,
+    &quot;Python.myTSEB_sensitivity_analysis_C&amp;NR.executor&quot;: &quot;Run&quot;,
+    &quot;Python.pyTSEB_analysis.executor&quot;: &quot;Run&quot;,
+    &quot;Python.raster_utils.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.sensitivity_analisys_2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.sensitivity_analysis.executor&quot;: &quot;Run&quot;,
+    &quot;Python.spectral_signature_S2SRF.executor&quot;: &quot;Run&quot;,
+    &quot;Python.temperature_partitioning.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.tseb.executor&quot;: &quot;Run&quot;,
+    &quot;Python.validation_IRTM.executor&quot;: &quot;Run&quot;,
+    &quot;Python.validation_LAI.executor&quot;: &quot;Run&quot;,
+    &quot;Python.visualization.executor&quot;: &quot;Run&quot;,
+    &quot;Python.visualization_LAI_TRAD_RIP720.executor&quot;: &quot;Run&quot;,
+    &quot;Python.wavelenght_simulation_PROSAIL.executor&quot;: &quot;Run&quot;,
+    &quot;Python.wavelenght_simulation_PROSAIL_Sentinel2.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/mqalborn/Desktop/BiophysicalTraitsSAT&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.keymap&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\mqalborn\Desktop\BiophysicalTraitsSAT" />
@@ -212,7 +209,11 @@
       <workItem from="1767648072451" duration="8395000" />
       <workItem from="1767715294904" duration="24364000" />
       <workItem from="1768417364144" duration="2891000" />
-      <workItem from="1768420284434" duration="12598000" />
+      <workItem from="1768420284434" duration="12687000" />
+      <workItem from="1768495595460" duration="25757000" />
+      <workItem from="1768585573387" duration="105000" />
+      <workItem from="1768585688678" duration="7844000" />
+      <workItem from="1768607773810" duration="3727000" />
     </task>
     <servers />
   </component>
@@ -308,16 +309,6 @@
           <line>64</line>
           <option name="timeStamp" value="452" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TSEB/myTSEB_sensitivity_analysis_C&amp;NH.py</url>
-          <line>410</line>
-          <option name="timeStamp" value="462" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TSEB/myTSEB_sensitivity_analysis_C&amp;NR.py</url>
-          <line>466</line>
-          <option name="timeStamp" value="472" />
-        </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="jupyter-line">
           <url>file://$PROJECT_DIR$/visualization_prosail.ipynb</url>
           <line>63</line>
@@ -376,9 +367,10 @@
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$wavelenght_simulation_PROSAIL_Sentinel2.coverage" NAME="wavelenght_simulation_PROSAIL_Sentinel2 Coverage Results" MODIFIED="1760466655114" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$spectral_signature_S2SRF.coverage" NAME="spectral_signature_S2SRF Coverage Results" MODIFIED="1760486109560" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/spectral_signature" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$get_stats.coverage" NAME="get_stats Coverage Results" MODIFIED="1762385794140" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$myTSEB_PT_sensitivity_analysis_C_NR.coverage" NAME="myTSEB_PT_sensitivity_analysis_C&amp;NR Coverage Results" MODIFIED="1768592106567" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/TSEB" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$S2BT_PROSAIIL.coverage" NAME="S2BT_PROSAIIL Coverage Results" MODIFIED="1760472150040" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$validation_LAI.coverage" NAME="validation_LAI Coverage Results" MODIFIED="1761262637777" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$myTSEB_sensitivity_analysis_C_NR.coverage" NAME="myTSEB_sensitivity_analysis_C&amp;NR Coverage Results" MODIFIED="1768437153642" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/TSEB" />
+    <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$myTSEB_sensitivity_analysis_C_NR.coverage" NAME="myTSEB_sensitivity_analysis_C&amp;NR Coverage Results" MODIFIED="1768523190161" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/TSEB" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$biophysical.coverage" NAME="biophysical Coverage Results" MODIFIED="1760397772144" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/functions" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$S2BT_PROSAIL_WORKSHOP.coverage" NAME="S2BT_PROSAIL_WORKSHOP Coverage Results" MODIFIED="1759882443603" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$LAI2200.coverage" NAME="LAI2200 Coverage Results" MODIFIED="1763419347741" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/LAI" />
