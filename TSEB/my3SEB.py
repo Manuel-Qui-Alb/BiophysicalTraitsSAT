@@ -8,6 +8,8 @@ import pyTSEB.meteo_utils as met
 from pyTSEB import resistances as res
 from pyTSEB import MO_similarity as MO
 import pyTSEB.TSEB as TSEB
+from pyTSEB import net_radiation as rad
+
 from SALib.sample import saltelli
 from SALib.analyze import sobol
 
@@ -193,28 +195,74 @@ def sensitivity_analysis_my3SEB(LAI_ov, fv_var_ov, h_V_ov, x_LAD_ov, leaf_width_
     )
 
     if np.any(np.array([R_A, R_x, R_sub])<=0):
-        print([R_A, R_x, R_sub]
+        print([R_A, R_x, R_sub])
 
     # Check how the Radiation interact between sources
-    Rn_V0, Rn_S0 = myTSEB.estimate_Rn(
+    LAI_ov_eff = LAI_ov * omega_ov
+    LAI_un_eff = LAI_ov * omega_un
+
+    difvis, difnir, fvis, fnir = TSEB.rad.calc_difuse_ratio(
         S_dn=Sdn,
         sza=sza_degrees,
-        P_atm=P_atm,
-        LAI=LAI_ov,
-        x_LAD=x_LAD_ov,
-        omega=omega_ov,
-        Tair=Tair,
-        ea=ea,
-        Trad_S=Trad_sub_0,
-        Trad_V=Trad_ov_0,
-        rho_vis_leaf=rho_vis_leaf,
-        rho_nir_leaf=rho_nir_leaf,
-        tau_vis_leaf=tau_vis_leaf,
-        tau_nir_leaf=tau_nir_leaf,
-        rho_vis_soil=rho_vis_soil,
-        rho_nir_soil=rho_nir_soil,
-        emis_leaf=emis_leaf,
-        emis_soil=emis_soil
+        press=P_atm
     )
+
+    skyl = fvis * difvis + fnir * difnir
+    Sdn_dir = (1. - skyl) * Sdn
+    Sdn_dif = skyl * Sdn
+
+
+    albb_ov, albd_ov, taubt_ov, taudt_ov = rad.calc_spectra_Cambpell(lai=LAI_ov,
+                                                         sza=sza_degrees,
+                                                         rho_leaf=np.array((rho_vis_leaf, rho_nir_leaf)),
+                                                         tau_leaf=np.array((tau_vis_leaf, tau_nir_leaf)),
+                                                         rho_soil=np.array((rho_vis_soil, rho_nir_soil)),
+                                                         x_lad=x_LAD_ov,
+                                                         lai_eff=LAI_ov_eff)
+
+    albb_un, albd_un, taubt_un, taudt_un = rad.calc_spectra_Cambpell(lai=LAI_un,
+                                                         sza=sza_degrees,
+                                                         rho_leaf=np.array((rho_vis_leaf, rho_nir_leaf)),
+                                                         tau_leaf=np.array((tau_vis_leaf, tau_nir_leaf)),
+                                                         rho_soil=np.array((rho_vis_soil, rho_nir_soil)),
+                                                         x_lad=LAI_un,
+                                                         lai_eff=LAI_un_eff)
+
+    S_dir_vis_un = taubt_ov[0] * Sdn_dir * fvis
+    S_dif_vis_un = taudt_ov[0] * Sdn_dif * fvis
+    S_dir_nir_un = taubt_ov[1] * Sdn_dir * fnir
+    S_dif_nir_un = taudt_ov[1] * Sdn_dif * fnir
+
+    Sn_ov = ((1.0 - taubt_ov[0]) * (1.0 - albb_ov[0]) * Sdn_dir * fvis
+            + (1.0 - taubt_ov[1]) * (1.0 - albb_ov[1]) * Sdn_dir * fnir
+            + (1.0 - taudt_ov[0]) * (1.0 - albd_ov[0]) * Sdn_dif * fvis
+            + (1.0 - taudt_ov[1]) * (1.0 - albd_ov[1]) * Sdn_dif * fnir)
+
+    Sn_un = ((1.0 - taubt_un[0]) * (1.0 - albb_un[0]) * S_dir_vis_un
+            + (1.0 - taubt_un[1]) * (1.0 - albb_un[1]) * S_dir_nir_un
+            + (1.0 - taudt_un[0]) * (1.0 - albd_un[0]) * S_dif_vis_un
+            + (1.0 - taudt_un[1]) * (1.0 - albd_un[1]) * S_dif_nir_un)
+
+
+    # Rn_V0, Rn_S0 = myTSEB.estimate_Rn(
+    #     S_dn=Sdn,
+    #     sza=sza_degrees,
+    #     P_atm=P_atm,
+    #     LAI=LAI_ov,
+    #     x_LAD=x_LAD_ov,
+    #     omega=omega_ov,
+    #     Tair=Tair,
+    #     ea=ea,
+    #     Trad_S=Trad_sub_0,
+    #     Trad_V=Trad_ov_0,
+    #     rho_vis_leaf=rho_vis_leaf,
+    #     rho_nir_leaf=rho_nir_leaf,
+    #     tau_vis_leaf=tau_vis_leaf,
+    #     tau_nir_leaf=tau_nir_leaf,
+    #     rho_vis_soil=rho_vis_soil,
+    #     rho_nir_soil=rho_nir_soil,
+    #     emis_leaf=emis_leaf,
+    #     emis_soil=emis_soil
+    # )
 
     return None
