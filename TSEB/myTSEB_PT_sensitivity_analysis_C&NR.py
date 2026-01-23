@@ -576,5 +576,6 @@ path = r'files/inputs_sensitivity_analysis_{}.csv'.format(T_MODEL)
 df_inputs.to_csv(path)
 """
 #
-for n, s1, st, c1, ct in zip(problem["names"], Si_LE_total["S1"], Si_LE_total["ST"], Si_LE_total["S1_conf"], Si_LE_total["ST_conf"]):
+for n, s1, st, c1, ct in zip(problem["names"], Si_LE_total["S1"], Si_LE_total["ST"], Si_LE_total["S1_conf"],
+                             Si_LE_total["ST_conf"]):
     print(f"{n:>12s} | S1={s1:.3f} (±{c1:.3f})  ST={st:.3f} (±{ct:.3f})")
