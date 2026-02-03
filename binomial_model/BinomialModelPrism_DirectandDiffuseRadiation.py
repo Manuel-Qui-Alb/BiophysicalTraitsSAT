@@ -6,8 +6,8 @@ from plyfile import PlyData, PlyElement
 def intersectBBox(ox, oy, oz, dx, dy, dz, sizex, sizey, sizez):
 
     # Intersection code below is adapted from Suffern (2007) Listing 19.1
-    x0 = -0.5*sizex
-    x1 = 0.5*sizex
+    x0 = -0.5 * sizex
+    x1 = 0.5 * sizex
     y0 = -0.5 * sizey
     y1 = 0.5 * sizey
     z0 = -1e-6
@@ -226,7 +226,224 @@ def compute_binomial_prism(
     PlTwo_PAR = np.sum(N * (1.0 - np.exp(-Gtheta * 2.0 * ameanv * a * S)))
     PlTwo_NIR = np.sum(N * (1.0 - np.exp(-Gtheta * 2.0 * ameann * a * S)))
 
-    S0_over_s2 = np.where(s2 > 0, S0 / s2, 0.0)
+    ####################################################################################################################
+    ##################################################### CHANGE #######################################################
+    ####################################################################################################################
+    # Sometime S0 / s2 retrives values greater than 1. So It should be clipped
+    S0_over_s2 = np.clip(np.where(s2 > 0, S0 / s2, 0.0), 0, 1)
+
+    #Canopy-level probability ofinterception
+    Pc1_PAR = (s2 / (sr * sp)) * (1.0 - (1.0 - PlOne_PAR * S0_over_s2) ** N_crown)
+    Pc1_NIR = (s2 / (sr * sp)) * (1.0 - (1.0 - PlOne_NIR * S0_over_s2) ** N_crown)
+    Pc2_PAR = (s2 / (sr * sp)) * (1.0 - (1.0 - PlTwo_PAR * S0_over_s2) ** N_crown)
+    Pc2_NIR = (s2 / (sr * sp)) * (1.0 - (1.0 - PlTwo_NIR * S0_over_s2) ** N_crown)
+
+    # Direct radiation absorbed by the soil
+    Rs_dir = IncPAR_dir  * (1.0 - Pc1_PAR) * (1-rsoilv) + IncNIR_dir  * (1.0 - Pc1_NIR)* (1-rsoiln)
+
+    soil_term_PAR = (1.0 - Pc1_PAR) * rsoilv * S0_over_s2 * PlOne_PAR
+    soil_term_NIR = (1.0 - Pc1_NIR) * rsoiln * S0_over_s2 * PlOne_NIR
+
+    # Direct radiation absorbed by the canopy
+    Rc_dir = (Pc2_PAR + soil_term_PAR) * IncPAR_dir  + (Pc2_NIR + soil_term_NIR) * IncNIR_dir
+
+    # ---- Diffuse sky part: integrate over hemisphere ----
+    # rectangular integration over zenith and azimuth:
+    dtheta = (0.5 * np.pi) / Nz_diff
+    dphi = (2.0 * np.pi) / Nphi_diff
+
+    # Accumulators for per-crown interception averages (used in soil terms)
+    PlOne_PAR_diff_tot = 0.0
+    PlOne_NIR_diff_tot = 0.0
+    PlTwo_PAR_diff_tot = 0.0
+    PlTwo_NIR_diff_tot = 0.0
+
+    # Accumulators for canopy-level interception (crown overlap included)
+    Pc1_PAR_diff = 0.0
+    Pc1_NIR_diff = 0.0
+    Pc2_PAR_diff = 0.0
+    Pc2_NIR_diff = 0.0
+
+    for i in range(Nz_diff):
+        # midpoint zenith
+        theta = (i + 0.5) * dtheta
+        sin_theta = np.sin(theta)
+        cos_theta = np.cos(theta)
+
+        for j in range(Nphi_diff):
+            # midpoint azimuth
+            phi = (j + 0.5) * dphi
+            # directional weight for isotropic diffuse sky
+            w_dir = (cos_theta * sin_theta * dtheta * dphi) / np.pi
+            # pathlength distribution for this direction
+            dist_d = pathlengthdistribution(
+                shape=shape,
+                scale_x=wc,
+                scale_y=sp,
+                scale_z=CanopyHeight,
+                ray_zenith=theta,
+                ray_azimuth=phi,
+                nrays=int(nrays // (Nz_diff * Nphi_diff)
+                          if nrays >= Nz_diff * Nphi_diff
+                          else max(100, int(nrays / (Nz_diff * Nphi_diff)))),
+                bins=int(Nbins),
+            )
+
+            N_d = dist_d["hist"] / np.sum(dist_d["hist"])
+            S_d = dist_d["bin_centers"]
+
+            # projection function
+            G_dir = Gtheta
+
+            # per-crown interception fractions (per beam, per spectral band)
+            PlOne_PAR_d = np.sum(N_d * (1.0 - np.exp(-G_dir * ameanv * a * S_d)))
+            PlOne_NIR_d = np.sum(N_d * (1.0 - np.exp(-G_dir * ameann * a * S_d)))
+            PlTwo_PAR_d = np.sum(N_d * (1.0 - np.exp(-G_dir * 2.0 * ameanv * a * S_d)))
+            PlTwo_NIR_d = np.sum(N_d * (1.0 - np.exp(-G_dir * 2.0 * ameann * a * S_d)))
+
+            PlOne_PAR_diff_tot += w_dir * PlOne_PAR_d
+            PlOne_NIR_diff_tot += w_dir * PlOne_NIR_d
+            PlTwo_PAR_diff_tot += w_dir * PlTwo_PAR_d
+            PlTwo_NIR_diff_tot += w_dir * PlTwo_NIR_d
+
+            S0 = sp * wc
+            Sthetadiff = (
+                    sp * wc
+                    + sp * CanopyHeight * np.tan(theta) * np.abs(np.sin(phi))
+                    + wc * CanopyHeight * np.tan(theta) * np.abs(np.cos(phi))
+            )
+            N_crowndiff = Sthetadiff / S0
+
+            Pc1_PAR_diff += w_dir * (s2 / (sr * sp)) * (1.0 - (1.0 - PlOne_PAR_d * S0_over_s2) ** N_crowndiff)
+            Pc1_NIR_diff += w_dir * (s2 / (sr * sp)) * (1.0 - (1.0 - PlOne_NIR_d * S0_over_s2) ** N_crowndiff)
+            Pc2_PAR_diff += w_dir * (s2 / (sr * sp)) * (1.0 - (1.0 - PlTwo_PAR_d * S0_over_s2) ** N_crowndiff)
+            Pc2_NIR_diff += w_dir * (s2 / (sr * sp)) * (1.0 - (1.0 - PlTwo_NIR_d * S0_over_s2) ** N_crowndiff)
+
+    # ---- Diffuse contributions to soil and canopy ----
+    Rs_diff = (IncPAR_diff * (1.0 - Pc1_PAR_diff) * (1.0 - rsoilv) +
+               IncNIR_diff * (1.0 - Pc1_NIR_diff) * (1.0 - rsoiln))
+
+    soil_term_PAR_diff = (1.0 - Pc1_PAR_diff) * rsoilv * S0_over_s2 * PlOne_PAR_diff_tot
+    soil_term_NIR_diff = (1.0 - Pc1_NIR_diff) * rsoiln * S0_over_s2 * PlOne_NIR_diff_tot
+
+    Rc_diff = ((Pc2_PAR_diff + soil_term_PAR_diff) * IncPAR_diff +
+               (Pc2_NIR_diff + soil_term_NIR_diff) * IncNIR_diff)
+
+    # ---- Total (direct + diffuse) ----
+    Rs_binomial = Rs_dir + Rs_diff
+    Rc_binomial = Rc_dir + Rc_diff
+
+    return Rc_binomial, Rs_binomial
+
+
+# ---------- Binomial radiation ----------
+def compute_binomial_prism_manuel(
+    sr, #Row spacing (meters)
+    sza, # sun zenith angle (radians)
+    psi, # sun azimuth relative to row orientation (radians)
+    lai, # Leaf Area Index
+    ameanv, # Leaf absorptivity in the visible (PAR) band
+    ameann, # Leaf absorptivity in the near infra-red band (NIR) band
+    rsoilv, # Soil absorptivity in the visible (PAR) band
+    rsoiln,  # Soil absorptivity in the near infra-red band (NIR) band
+    Srad_dir,  # Direct-beam incoming radiation (W m-2)
+    Srad_diff,  # Diffuse incoming radiation (W m-2)
+    fvis, # Fraction incoming radiation in the visible part of the spectrum
+    fnir,  # Fraction incoming radiation in the near infra-red part of the spectrum
+    CanopyHeight,# Canopy heigth (meters)
+    wc, # Canopy width (meters)
+    sp, #Plant spacing (meters)
+    Gtheta, # fraction of leaf area projected in the direction of the sun
+    nrays,
+    Nbins,
+    shape="prism",   # <-- shape of the canopy
+    Nz_diff=16,
+    Nphi_diff=32,  # sampling for diffuse hemisphere
+):
+    """
+    Returns:
+        Rc_binomial: canopy absorbed radiation (W m-2),
+        Rs_binomial: soil absorbed radiation (W m-2)
+    Both include direct + isotropic diffuse contributions.
+
+
+    References:
+    - Bailey, B.N., Ponce de León, M.A., and Krayenhoff, E.S., 2020. One-dimensional models of radiation transfer in homogeneous canopies: A review, re-evaluation, and improved model. Geoscientific Model Development 13:4789:4808
+    - Bailey, B.N. and Fu, K., 2022. The probability distribution of absorbed direct, diffuse, and scattered radiation in plant canopies with varying structure. Agricultural and Forest Meteorology, 322, p.109009.
+    - Ponce de León, M.A., Alfieri, J.G., Prueger, J.H., Hipps, L., Kustas, W.P., Agam, N., Bambach, N., McElrone, A.J., Knipper, K., Roby, M.C. and Bailey, B.N., 2025.
+      One-dimensional modeling of radiation absorption by vine canopies: evaluation of existing model assumptions, and development of an improved generalized model.
+      Agricultural and Forest Meteorology, 373, p.110706 (https://doi.org/10.1016/j.agrformet.2025.110706)
+    - Path length distribution code: https://github.com/PlantSimulationLab/pathlengthdistribution
+    """
+
+    IncPAR_dir  = Srad_dir * fvis
+    IncNIR_dir  = Srad_dir * fnir
+    IncPAR_diff = Srad_diff * fvis
+    IncNIR_diff = Srad_diff * fnir
+
+    # Within-prism leaf area density
+    a = lai * sr * sp / (sp * wc * CanopyHeight)
+
+    # Adjusted effective spacing for row-oriented canopies
+    s = sr * np.sin(psi) ** 2 + sp * np.cos(psi) ** 2
+    s2 = s**2
+
+    # Area of a single prism shadow at solar zenith of 0
+    S0 = sp * wc
+    #Area of a single prism shadow at solar zenith (θs) and relative azimuth angle
+    # between the incident beam and the row direction (ϕ)
+    Stheta = (
+        sp * wc
+        + sp * CanopyHeight * np.tan(sza) * np.abs(np.sin(psi))
+        + wc * CanopyHeight * np.tan(sza) * np.abs(np.cos(psi))
+    )
+    #Number of prisms intersected by a beam of radiation
+    N_crown = Stheta / S0
+
+    x = 0
+    dists = [pathlengthdistribution(shape=shape, scale_x=wc[x], scale_y=sp[x], scale_z=CanopyHeight[x], ray_zenith=sza[x],
+                            ray_azimuth=psi[x], nrays=int(nrays), bins=int(Nbins)) for x in np.arange(0, len(wc))]
+
+    def hist_divide_sumhist(dist):
+        N = dist["hist"] / (np.sum(dist["hist"]))
+        S = dist["bin_centers"]
+        return dict(N=N, S=S)
+
+    dict_N_S = list(map(hist_divide_sumhist, dists))
+    # dist = pathlengthdistribution(
+    #     shape=shape,
+    #     scale_x=wc[x],
+    #     scale_y=sp[x],
+    #     scale_z=CanopyHeight[x],
+    #     ray_zenith=sza[x],
+    #     ray_azimuth=psi[x],
+    #     nrays=int(nrays),
+    #     bins=int(Nbins),
+    # )
+    # N = dist["hist"] / (np.sum(dist["hist"]))
+    # S = dist["bin_centers"]
+
+    N = np.array([dict_N_S[x]['N'] for x in np.arange(len(dict_N_S))])
+    S = np.array([dict_N_S[x]['S'] for x in np.arange(len(dict_N_S))])
+
+    factor_one_vis = (Gtheta * ameanv * a)
+    factor_one_nir = (Gtheta * ameann * a)
+
+    factor_two_vis = (Gtheta * 2.0 * ameanv * a)
+    factor_two_nir = (Gtheta * 2.0 * ameann * a)
+
+    #Probability of intersecting a leaf within a prism during first and second order scattering
+    PlOne_PAR = np.sum(N * (1.0 - np.exp(-factor_one_vis[:, None] * S)), axis=1)
+    PlOne_NIR = np.sum(N * (1.0 - np.exp(-factor_one_nir[:, None] * S)), axis=1)
+    PlTwo_PAR = np.sum(N * (1.0 - np.exp(-factor_two_vis[:, None] * S)), axis=1)
+    PlTwo_NIR = np.sum(N * (1.0 - np.exp(-factor_two_nir[:, None] * S)), axis=1)
+
+    ####################################################################################################################
+    ##################################################### CHANGE #######################################################
+    ####################################################################################################################
+    # Sometime S0 / s2 retrives values greater than 1. So It should be clipped
+    S0_over_s2 = np.clip(np.where(s2 > 0, S0 / s2, 0.0), 0, 1)
+
     #Canopy-level probability ofinterception
     Pc1_PAR = (s2 / (sr * sp)) * (1.0 - (1.0 - PlOne_PAR * S0_over_s2) ** N_crown)
     Pc1_NIR = (s2 / (sr * sp)) * (1.0 - (1.0 - PlOne_NIR * S0_over_s2) ** N_crown)

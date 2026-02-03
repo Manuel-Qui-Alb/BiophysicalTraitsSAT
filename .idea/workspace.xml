@@ -5,10 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="eb90ce6c-f203-49d1-a695-676ebfb5f362" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/binomial_model/3SEB_FAPAR_BINOMIAL.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/binomial_model/BinomialModelPrism_DirectandDiffuseRadiation.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/GeneralFunctions.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/fieldspec/read_file.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/fieldspec/read_folder.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/fieldspec/visualize.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TSEB/3SEB_fAPAR.py" beforeDir="false" afterPath="$PROJECT_DIR$/TSEB/3SEB_fAPAR_C&amp;N.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/binomial_model/3SEB_FAPAR_BINOMIAL.py" beforeDir="false" afterPath="$PROJECT_DIR$/binomial_model/3SEB_FAPAR_BINOMIAL.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -53,6 +55,7 @@
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "Python tests.Doctests in base.executor": "Run",
     "Python tests.Doctests in generic.executor": "Debug",
+    "Python.3SEB_FAPAR_BINOMIAL.executor": "Debug",
     "Python.3SEB_fAPAR.executor": "Run",
     "Python.BIOPHYSICAL_TRAITS_RTM.executor": "Run",
     "Python.BIOPHYSICAL_TRAITS_RTM_S2.executor": "Run",
@@ -92,6 +95,7 @@
     "Python.myTSEB_sensitivity_analysis_C&NR.executor": "Run",
     "Python.pyTSEB_analysis.executor": "Run",
     "Python.raster_utils.executor": "Debug",
+    "Python.read_folder.executor": "Run",
     "Python.sensitivity_analisys_2.executor": "Run",
     "Python.sensitivity_analysis.executor": "Run",
     "Python.spectral_signature_S2SRF.executor": "Run",
@@ -102,6 +106,7 @@
     "Python.validation_LAI.executor": "Run",
     "Python.visualization.executor": "Run",
     "Python.visualization_LAI_TRAD_RIP720.executor": "Run",
+    "Python.visualize.executor": "Run",
     "Python.wavelenght_simulation_PROSAIL.executor": "Run",
     "Python.wavelenght_simulation_PROSAIL_Sentinel2.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
@@ -221,6 +226,12 @@
       <workItem from="1769102763321" duration="11759000" />
       <workItem from="1769192899915" duration="8395000" />
       <workItem from="1769561576722" duration="3113000" />
+      <workItem from="1769565388778" duration="48000" />
+      <workItem from="1769617044894" duration="12120000" />
+      <workItem from="1769755065111" duration="1000" />
+      <workItem from="1769755105846" duration="1648000" />
+      <workItem from="1769998751563" duration="390000" />
+      <workItem from="1769999803456" duration="2632000" />
     </task>
     <servers />
   </component>
@@ -316,6 +327,21 @@
           <line>50</line>
           <option name="timeStamp" value="469" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/fieldspec/read_file.py</url>
+          <line>7</line>
+          <option name="timeStamp" value="473" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/fieldspec/visualize.py</url>
+          <line>19</line>
+          <option name="timeStamp" value="490" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/binomial_model/3SEB_FAPAR_BINOMIAL.py</url>
+          <line>8</line>
+          <option name="timeStamp" value="491" />
+        </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="jupyter-line">
           <url>file://$PROJECT_DIR$/visualization_prosail.ipynb</url>
           <line>63</line>
@@ -382,6 +408,7 @@
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$S2BT_PROSAIL_WORKSHOP.coverage" NAME="S2BT_PROSAIL_WORKSHOP Coverage Results" MODIFIED="1759882443603" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$LAI2200.coverage" NAME="LAI2200 Coverage Results" MODIFIED="1763419347741" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/LAI" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$temperature_partitioning.coverage" NAME="temperature_partitioning Coverage Results" MODIFIED="1763079263435" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/temperature_partitioning" />
+    <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$3SEB_FAPAR_BINOMIAL.coverage" NAME="3SEB_FAPAR_BINOMIAL Coverage Results" MODIFIED="1770001819779" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/binomial_model" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$myTSEB_sensitivity_analysis.coverage" NAME="myTSEB_sensitivity_analysis Coverage Results" MODIFIED="1767785111633" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/TSEB" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$download_S2images.coverage" NAME="download_S2images Coverage Results" MODIFIED="1759966828216" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/gee_processing" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$download_MCD19A2.coverage" NAME="download_MCD19A2 Coverage Results" MODIFIED="1760038738983" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/gee_processing/gee" />
@@ -402,9 +429,10 @@
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$sensitivity_analisys_2.coverage" NAME="sensitivity_analisys_2 Coverage Results" MODIFIED="1764011632547" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/TSEB" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$get_reflectance_S2.coverage" NAME="get_reflectance_S2 Coverage Results" MODIFIED="1761001057295" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$raster_utils.coverage" NAME="raster_utils Coverage Results" MODIFIED="1761609756731" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/functions" />
-    <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$visualization.coverage" NAME="visualization Coverage Results" MODIFIED="1765811513477" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/TSEB" />
+    <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$visualization.coverage" NAME="visualization Coverage Results" MODIFIED="1769635138981" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/fieldspec" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$3SEB_fAPAR.coverage" NAME="3SEB_fAPAR Coverage Results" MODIFIED="1769206397268" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/TSEB" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$BIOPHYSICAL_TRAITS_RTM_S2.coverage" NAME="BIOPHYSICAL_TRAITS_RTM_S2 Coverage Results" MODIFIED="1760984497211" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$visualize.coverage" NAME="visualize Coverage Results" MODIFIED="1769644628859" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/fieldspec" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$validation_IRTM.coverage" NAME="validation_IRTM Coverage Results" MODIFIED="1760741700721" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$get_stats_LAIRIP.coverage" NAME="get_stats_LAIRIP Coverage Results" MODIFIED="1761243363010" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$tseb.coverage" NAME="tseb Coverage Results" MODIFIED="1761693102296" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
@@ -414,6 +442,7 @@
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$S2_reflectance_analysis.coverage" NAME="S2_reflectance_analysis Coverage Results" MODIFIED="1759967368813" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$test.coverage" NAME="test Coverage Results" MODIFIED="1767715310295" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/stations" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$developer.coverage" NAME="developer Coverage Results" MODIFIED="1761073496021" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/gee_processing" />
+    <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$read_folder.coverage" NAME="read_folder Coverage Results" MODIFIED="1769642882654" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/fieldspec" />
     <SUITE FILE_PATH="coverage/BiophysicalTraitsSAT$get_stats_L0X.coverage" NAME="get_stats_L0X Coverage Results" MODIFIED="1761610288982" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
