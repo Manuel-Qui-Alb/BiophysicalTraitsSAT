@@ -22,7 +22,7 @@ for fd in fdiff_values:
         sr=3.35,
         sza=sza_i,
         psi=ssa_i,
-        lai= 1.7923,
+        lai=1.7923,
         ameanv=0.8,
         ameann=0.34,
         rsoilv=0.12,

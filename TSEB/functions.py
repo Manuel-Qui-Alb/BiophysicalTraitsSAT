@@ -120,7 +120,7 @@ def off_nadir_clumpling_index_Kustas_Norman(LAI, fv, h_V, w_V, x_LAD, sza):
     return omega
 
 
-def rectangular_row_clumping_index_parry(LAI, fv0, w_V, h_V, sza, saa, row_azimuth, hb_V=0, L=None, x_LAD=1 ):
+def rectangular_row_clumping_index_parry(LAI, fv0, w_V, h_V, sza, phi, hb_V=0, L=None, x_LAD=1 ):
     """
     Estimate the off nadir clumpling index from Campbell and Norman (1998) and Parry (2019).
 
@@ -144,13 +144,9 @@ def rectangular_row_clumping_index_parry(LAI, fv0, w_V, h_V, sza, saa, row_azimu
         and x > 1 for more horizontal leaves.
     sza : float
         Solar zenith angle in radians.
-    saa : float
-        Solar Azimuth angle in radians
-    row_azimuth : float
-        row azimuth angle in radians
     phi : float
         relative azimuth angle between the incident beam and the row direction (radians)
-        row direction - solar azimuth
+        np.arc(np.cos(row direction - solar azimuth))
 
     Returns
     -------
@@ -158,7 +154,7 @@ def rectangular_row_clumping_index_parry(LAI, fv0, w_V, h_V, sza, saa, row_azimu
         Omega: Off-Nadir clumping index (dimensionless).
     """
 
-    phi = saa - row_azimuth
+    # phi_radians = np.arccos(np.cos(saa_radians - row_azimuth_radians))
 
     K_be = estimate_Kbe(x_LAD, sza)
 
@@ -233,21 +229,24 @@ def estimate_Trad_S(Trad, Trad_V, f_theta):
     Trad_V_f = (Trad_V ** 4) * f_theta
     Trad_4 = (Trad ** 4)
 
-    invalid_rad = Trad_V_f > Trad_4
+
+    Trad_diff = (Trad_4 - Trad_V_f)
+    invalid_rad = Trad_diff < 0
 
     if np.any(invalid_rad):
         warnings.warn(
             "Radiative inconsistency detected: Trad_V > Trad "
             "leading to negative term in Trad_S estimation. "
-            "Setting Trad_S = NaN for these cases.",
+            "Setting Trad_S = 0 for these cases.",
             RuntimeWarning
         )
+        Trad_diff[invalid_rad] = 0
 
-    Trad_S = ((Trad_4 - Trad_V_f) / (1 - f_theta)) ** (1 / 4)
+    Trad_S = (Trad_diff / (1 - f_theta)) ** (1 / 4)
     return Trad_S
 
 
-def estimate_Rn(S_dn, sza, LAI, Trad_S, Trad_V,
+def estimate_Rn(Sdn_dir, Sdn_dif, fvis, fnir, sza, LAI, Trad_S, Trad_V,
                 Tair, ea, P_atm=1013, omega=1, x_LAD=1,
                 rho_vis_leaf=0.07, rho_nir_leaf=0.32, tau_vis_leaf=0.08, tau_nir_leaf=0.33, rho_vis_soil=0.15,
                 rho_nir_soil=0.25, emis_leaf=0.98, emis_soil=0.95):
@@ -289,17 +288,80 @@ def estimate_Rn(S_dn, sza, LAI, Trad_S, Trad_V,
     float
         Estimated net radiation (W m-2).
     """
+    LAI_eff = LAI * omega
+
+    Sn_V, Sn_S = shortwave_transmittance_model_CN(
+        Sdn_dir=Sdn_dir,
+        Sdn_dif=Sdn_dif,
+        fvis=fvis,
+        fnir=fnir,
+        sza=sza,
+        LAI=LAI,
+        omega=omega,
+        x_LAD=x_LAD,
+        rho_vis_leaf=rho_vis_leaf,
+        rho_nir_leaf=rho_nir_leaf,
+        tau_vis_leaf=tau_vis_leaf,
+        tau_nir_leaf=tau_nir_leaf,
+        rho_vis_soil=rho_vis_soil,
+        rho_nir_soil=rho_nir_soil)
+
+    # sn_veg[~np.isfinite(Sn_V)] = 0
+    # sn_soil[~np.isfinite(sn_soil)] = 0
+
+    Ln = rad.calc_longwave_irradiance(ea, Tair, p=P_atm, z_T=2.0, h_C=2.0)
+    Ln_V, Ln_S = rad.calc_L_n_Campbell(Trad_V, Trad_S, Ln, LAI_eff, emis_leaf, emis_soil, x_LAD=x_LAD)
+
+    Rn_V = Sn_V + Ln_V
+    Rn_S = Sn_S + Ln_S
+
+    # Rn_V = np.array(np.clip(Rn_V, -150, S_dn + Ln))
+    # Rn_S = np.array(np.clip(Rn_S, -150, S_dn + Ln))
+    return  Sn_V, Sn_S, Rn_V, Rn_S
+
+
+def shortwave_transmittance_model_CN(Sdn_dir, Sdn_dif,fvis, fnir, sza,
+                                     LAI, omega=1, x_LAD=1,
+                                     rho_vis_leaf=0.07, rho_nir_leaf=0.32, tau_vis_leaf=0.08, tau_nir_leaf=0.33,
+                                     rho_vis_soil=0.15, rho_nir_soil=0.25):
+    """
+       Estimate net radiation (Rn)
+       Parameters
+       ----------
+       S_dn : float
+           Incoming shortwave radiation at the surface (W m-2).
+       sza : float
+           Solar zenith angle in degrees.
+       LAI : float
+           Leaf Area Index.
+       P_atm : float, optional
+           atmospheric pressure (mb), default at sea level (1013mb).
+       omega : float, optional
+           Clumping index (default = 1 = random canopy).
+       x_LAD : float, optional
+           Leaf angle distribution parameter for ellipsoidal LAD model.
+       rho_vis_leaf, rho_nir_leaf : float
+           Leaf reflectance in VIS and NIR.
+       tau_vis_leaf, tau_nir_leaf : float
+           Leaf transmittance in VIS and NIR.
+       rho_vis_soil, rho_nir_soil : float
+           Soil reflectance in VIS and NIR.
+       Returns
+       -------
+       float
+           Estimated Vegetation and ground Shortwave Net Radiation (W m-2).
+       """
 
     LAI_eff = LAI * omega
-    difvis, difnir, fvis, fnir = TSEB.rad.calc_difuse_ratio(
-        S_dn=S_dn,
-        sza=sza,
-        press=P_atm
-    )
-
-    skyl = fvis * difvis + fnir * difnir
-    Sdn_dir = (1. - skyl) * S_dn
-    Sdn_dif = skyl * S_dn
+    # difvis, difnir, fvis, fnir = TSEB.rad.calc_difuse_ratio(
+    #     S_dn=S_dn,
+    #     sza=sza,
+    #     press=P_atm
+    # )
+    #
+    # skyl = fvis * difvis + fnir * difnir
+    # Sdn_dir = (1. - skyl) * S_dn
+    # Sdn_dif = skyl * S_dn
 
     albb, albd, taubt, taudt = rad.calc_spectra_Cambpell(lai=LAI,
                                                          sza=sza,
@@ -322,21 +384,32 @@ def estimate_Rn(S_dn, sza, LAI, Trad_S, Trad_V,
     Sn_V = np.asarray(Sn_V)
     Sn_S = np.asarray(Sn_S)
 
-    # sn_veg[~np.isfinite(Sn_V)] = 0
-    # sn_soil[~np.isfinite(sn_soil)] = 0
-
-    Ln = rad.calc_longwave_irradiance(ea, Tair, p=P_atm, z_T=2.0, h_C=2.0)
-    Ln_V, Ln_S = rad.calc_L_n_Campbell(Trad_V, Trad_S, Ln, LAI_eff, emis_leaf, emis_soil, x_LAD=x_LAD)
-
-    Rn_V = Sn_V + Ln_V
-    Rn_S = Sn_S + Ln_S
-
-    # Rn_V = np.array(np.clip(Rn_V, -150, S_dn + Ln))
-    # Rn_S = np.array(np.clip(Rn_S, -150, S_dn + Ln))
-    return Rn_V, Rn_S
-
+    return Sn_V, Sn_S
 
 def Priestly_Taylor_LE_V(fv_g, Rn_V, alpha_PT, Tair, P_atm, c_p):
+    """
+    ----------
+    fv_g: float
+        fraction of vegetation that is green and hence transpiring
+    VPD : float
+        Vapour pressure deficit.
+    Rn_V : float
+        Vegetation (Canopy) Net Radiation  (w m-2).
+    alpha_PT : float
+        Priestley-Taylor parameter (mb).
+    Tair : float
+        air temperature at reference height (Kelvin).
+    P_atm : float
+        Atmospheric Pressure.
+    c_p : float
+        specific heat of air.
+    Returns
+    -------
+    float
+        LE_V = Vegetation (Canopy) Latent Heat Flux (W m-2).
+
+
+    """
     # slope of the saturation pressure curve (kPa./deg C)
     s = met.calc_delta_vapor_pressure(Tair)
     s = s * 10  # to mb

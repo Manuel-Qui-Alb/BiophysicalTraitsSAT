@@ -70,7 +70,8 @@ def intersectBBox(ox, oy, oz, dx, dy, dz, sizex, sizey, sizez):
     ze = oz + t1 * dz
 
     if dr == 0:
-         raise Exception('Shouldnt be here')
+         # raise Exception('Shouldnt be here')
+         dr, xe, ye, ze = np.nan, np.nan, np.nan, np.nan
     return dr, xe, ye, ze
 
 def pathlengths(shape, scale_x, scale_y, scale_z, ray_zenith, ray_azimuth, nrays, outputfile=''):
@@ -138,11 +139,14 @@ def pathlengthdistribution(
     bins=10,
     normalize=True,
 ):
+
     pl = pathlengths(shape, scale_x, scale_y, scale_z, ray_zenith, ray_azimuth, nrays, plyfile)
+
     hist, bin_edges = np.histogram(pl, bins=bins, density=normalize)
     bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
     return {"hist": hist, "bin_centers": bin_centers}
 
+import time
 # ---------- Binomial radiation ----------
 def compute_binomial_prism(
     sr, #Row spacing (meters)
@@ -207,6 +211,7 @@ def compute_binomial_prism(
     #Number of prisms intersected by a beam of radiation
     N_crown = Stheta / S0
 
+    # start_time_ale = time.perf_counter()
     dist = pathlengthdistribution(
         shape=shape,
         scale_x=wc,
@@ -219,6 +224,10 @@ def compute_binomial_prism(
     )
     N = dist["hist"] / (np.sum(dist["hist"]))
     S = dist["bin_centers"]
+
+    # end_time_ale = time.perf_counter()
+    # elapsed_time_ale = end_time_ale - start_time_ale
+    # print(f"Execution time Ale: {elapsed_time_ale} seconds")
 
     #Probability of intersecting a leaf within a prism during first and second order scattering
     PlOne_PAR = np.sum(N * (1.0 - np.exp(-Gtheta * ameanv * a * S)))
@@ -336,6 +345,29 @@ def compute_binomial_prism(
     return Rc_binomial, Rs_binomial
 
 
+from GeneralFunctions import _to_2d, normalize_inputs_flat
+
+
+def hist_divide_sumhist(dist):
+    N = dist["hist"] / (np.sum(dist["hist"]))
+    S = dist["bin_centers"]
+    return dict(N=N, S=S)
+
+
+def calculate_p_lone_p_ltwo(N, G, abs_leaf, a, S):
+    PlOne_d = np.sum(N * (1.0 - np.exp(-G * abs_leaf * a * S)), axis=1)
+    PlTwo_d = np.sum(N * (1.0 - np.exp(-G * 2.0 * abs_leaf * a * S)), axis=1)
+    return _to_2d(PlOne_d), _to_2d(PlTwo_d)
+
+Pc_function = lambda s2, sr, sp, Pl, S0_over_s2, N_crown: (s2 / (sr * sp)) * (1.0 - (1.0 - Pl * S0_over_s2)
+                                                                                  ** N_crown)
+
+Pc_diff_function = lambda w_dir, s2, sr, sp, Pl, S0_over_s2, N_crowndiff:  (
+                    w_dir * (s2 / (sr * sp)) * (1.0 - (1.0 - Pl * S0_over_s2) ** N_crowndiff))
+
+from joblib import Parallel, delayed
+
+
 # ---------- Binomial radiation ----------
 def compute_binomial_prism_manuel(
     sr, #Row spacing (meters)
@@ -376,6 +408,10 @@ def compute_binomial_prism_manuel(
     - Path length distribution code: https://github.com/PlantSimulationLab/pathlengthdistribution
     """
 
+    (sr, sza, psi, lai, ameanv, ameann, rsoilv, rsoiln, Srad_dir, Srad_diff, fvis, fnir, CanopyHeight,
+     wc, sp, Gtheta, ref_shape) = normalize_inputs_flat(sr, sza, psi, lai, ameanv, ameann, rsoilv, rsoiln, Srad_dir,
+                                                        Srad_diff, fvis, fnir, CanopyHeight, wc, sp, Gtheta)
+
     IncPAR_dir  = Srad_dir * fvis
     IncNIR_dir  = Srad_dir * fnir
     IncPAR_diff = Srad_diff * fvis
@@ -400,43 +436,32 @@ def compute_binomial_prism_manuel(
     #Number of prisms intersected by a beam of radiation
     N_crown = Stheta / S0
 
-    x = 0
-    dists = [pathlengthdistribution(shape=shape, scale_x=wc[x], scale_y=sp[x], scale_z=CanopyHeight[x], ray_zenith=sza[x],
-                            ray_azimuth=psi[x], nrays=int(nrays), bins=int(Nbins)) for x in np.arange(0, len(wc))]
+    # start_time_man = time.perf_counter()
 
-    def hist_divide_sumhist(dist):
-        N = dist["hist"] / (np.sum(dist["hist"]))
-        S = dist["bin_centers"]
-        return dict(N=N, S=S)
+    dists = Parallel(n_jobs= max(1, os.cpu_count() - 2), prefer="processes", verbose=0)(
+        delayed(pathlengthdistribution)(
+            shape=shape, scale_x=wx, scale_y=spy, scale_z=hz,
+            ray_zenith=sz, ray_azimuth=az, nrays=nrays, bins=Nbins
+        )
+        for wx, spy, hz, sz, az in zip(wc[:, 0], sp[:, 0], CanopyHeight[:, 0], sza[:, 0], psi[:, 0])
+    )
+    # #
+    # dists = [pathlengthdistribution(shape=shape, scale_x=wx, scale_y=spy, scale_z=hz, ray_zenith=sz, ray_azimuth=az,
+    #                                 nrays=nrays, bins=Nbins)
+    #          for wx, spy, hz, sz, az in zip(wc[:, 0], sp[:, 0], CanopyHeight[:, 0], sza[:, 0], psi[:, 0])]
+    # end_time_man = time.perf_counter()
+    #
+    # elapsed_time_man = end_time_man - start_time_man
+    # print(f"Execution time Manuel: {elapsed_time_man} seconds")
 
     dict_N_S = list(map(hist_divide_sumhist, dists))
-    # dist = pathlengthdistribution(
-    #     shape=shape,
-    #     scale_x=wc[x],
-    #     scale_y=sp[x],
-    #     scale_z=CanopyHeight[x],
-    #     ray_zenith=sza[x],
-    #     ray_azimuth=psi[x],
-    #     nrays=int(nrays),
-    #     bins=int(Nbins),
-    # )
-    # N = dist["hist"] / (np.sum(dist["hist"]))
-    # S = dist["bin_centers"]
 
     N = np.array([dict_N_S[x]['N'] for x in np.arange(len(dict_N_S))])
     S = np.array([dict_N_S[x]['S'] for x in np.arange(len(dict_N_S))])
 
-    factor_one_vis = (Gtheta * ameanv * a)
-    factor_one_nir = (Gtheta * ameann * a)
-
-    factor_two_vis = (Gtheta * 2.0 * ameanv * a)
-    factor_two_nir = (Gtheta * 2.0 * ameann * a)
-
     #Probability of intersecting a leaf within a prism during first and second order scattering
-    PlOne_PAR = np.sum(N * (1.0 - np.exp(-factor_one_vis[:, None] * S)), axis=1)
-    PlOne_NIR = np.sum(N * (1.0 - np.exp(-factor_one_nir[:, None] * S)), axis=1)
-    PlTwo_PAR = np.sum(N * (1.0 - np.exp(-factor_two_vis[:, None] * S)), axis=1)
-    PlTwo_NIR = np.sum(N * (1.0 - np.exp(-factor_two_nir[:, None] * S)), axis=1)
+    PlOne_PAR, PlTwo_PAR = calculate_p_lone_p_ltwo(N, G=Gtheta, abs_leaf=ameanv, a=a, S=S)
+    PlOne_NIR, PlTwo_NIR = calculate_p_lone_p_ltwo(N, G=Gtheta, abs_leaf=ameann, a=a, S=S)
 
     ####################################################################################################################
     ##################################################### CHANGE #######################################################
@@ -444,11 +469,11 @@ def compute_binomial_prism_manuel(
     # Sometime S0 / s2 retrives values greater than 1. So It should be clipped
     S0_over_s2 = np.clip(np.where(s2 > 0, S0 / s2, 0.0), 0, 1)
 
-    #Canopy-level probability ofinterception
-    Pc1_PAR = (s2 / (sr * sp)) * (1.0 - (1.0 - PlOne_PAR * S0_over_s2) ** N_crown)
-    Pc1_NIR = (s2 / (sr * sp)) * (1.0 - (1.0 - PlOne_NIR * S0_over_s2) ** N_crown)
-    Pc2_PAR = (s2 / (sr * sp)) * (1.0 - (1.0 - PlTwo_PAR * S0_over_s2) ** N_crown)
-    Pc2_NIR = (s2 / (sr * sp)) * (1.0 - (1.0 - PlTwo_NIR * S0_over_s2) ** N_crown)
+    #Canopy-level probability of interception
+    Pc1_PAR = Pc_function(s2, sr, sp, PlOne_PAR, S0_over_s2, N_crown)
+    Pc1_NIR = Pc_function(s2, sr, sp, PlOne_NIR, S0_over_s2, N_crown)
+    Pc2_PAR = Pc_function(s2, sr, sp, PlTwo_PAR, S0_over_s2, N_crown)
+    Pc2_NIR = Pc_function(s2, sr, sp, PlTwo_NIR, S0_over_s2, N_crown)
 
     # Direct radiation absorbed by the soil
     Rs_dir = IncPAR_dir  * (1.0 - Pc1_PAR) * (1-rsoilv) + IncNIR_dir  * (1.0 - Pc1_NIR)* (1-rsoiln)
@@ -487,31 +512,34 @@ def compute_binomial_prism_manuel(
             phi = (j + 0.5) * dphi
             # directional weight for isotropic diffuse sky
             w_dir = (cos_theta * sin_theta * dtheta * dphi) / np.pi
-            # pathlength distribution for this direction
-            dist_d = pathlengthdistribution(
-                shape=shape,
-                scale_x=wc,
-                scale_y=sp,
-                scale_z=CanopyHeight,
-                ray_zenith=theta,
-                ray_azimuth=phi,
-                nrays=int(nrays // (Nz_diff * Nphi_diff)
-                          if nrays >= Nz_diff * Nphi_diff
-                          else max(100, int(nrays / (Nz_diff * Nphi_diff)))),
-                bins=int(Nbins),
-            )
 
-            N_d = dist_d["hist"] / np.sum(dist_d["hist"])
-            S_d = dist_d["bin_centers"]
+            # pathlength distribution for this direction
+            nray = int(nrays // (Nz_diff * Nphi_diff)
+                       if nrays >= Nz_diff * Nphi_diff
+                       else max(100, int(nrays / (Nz_diff * Nphi_diff)))
+                       )
+
+            dist_d_N_S = [pathlengthdistribution(shape=shape, scale_x=wx, scale_y=spy, scale_z=hz,
+                                                 ray_zenith=theta, ray_azimuth=phi, nrays=nray, bins=int(Nbins))
+                              for wx, spy, hz in zip(wc[:, 0], sp[:, 0], CanopyHeight[:, 0])]
+            #
+            # dist_d_N_S = Parallel(n_jobs=-1, prefer="processes")(
+            #     delayed(pathlengthdistribution)(
+            #         shape=shape, scale_x=wx, scale_y=spy, scale_z=hz,
+            #         ray_zenith=theta, ray_azimuth=phi, nrays=nrays, bins=Nbins
+            #     )
+            #     for wx, spy, hz in zip(wc[:, 0], sp[:, 0], CanopyHeight[:, 0]))
+
+            dist_d_N_S = list(map(hist_divide_sumhist, dist_d_N_S))
+            N_d = np.array([dist_d_N_S[x]['N'] for x in np.arange(len(dist_d_N_S))])
+            S_d = np.array([dist_d_N_S[x]['S'] for x in np.arange(len(dist_d_N_S))])
 
             # projection function
             G_dir = Gtheta
 
             # per-crown interception fractions (per beam, per spectral band)
-            PlOne_PAR_d = np.sum(N_d * (1.0 - np.exp(-G_dir * ameanv * a * S_d)))
-            PlOne_NIR_d = np.sum(N_d * (1.0 - np.exp(-G_dir * ameann * a * S_d)))
-            PlTwo_PAR_d = np.sum(N_d * (1.0 - np.exp(-G_dir * 2.0 * ameanv * a * S_d)))
-            PlTwo_NIR_d = np.sum(N_d * (1.0 - np.exp(-G_dir * 2.0 * ameann * a * S_d)))
+            PlOne_PAR_d, PlTwo_PAR_d = calculate_p_lone_p_ltwo(N=N_d, G=G_dir, abs_leaf=ameanv, a=a, S=S_d)
+            PlOne_NIR_d, PlTwo_NIR_d = calculate_p_lone_p_ltwo(N=N_d, G=G_dir, abs_leaf=ameann, a=a, S=S_d)
 
             PlOne_PAR_diff_tot += w_dir * PlOne_PAR_d
             PlOne_NIR_diff_tot += w_dir * PlOne_NIR_d
@@ -526,10 +554,12 @@ def compute_binomial_prism_manuel(
             )
             N_crowndiff = Sthetadiff / S0
 
-            Pc1_PAR_diff += w_dir * (s2 / (sr * sp)) * (1.0 - (1.0 - PlOne_PAR_d * S0_over_s2) ** N_crowndiff)
-            Pc1_NIR_diff += w_dir * (s2 / (sr * sp)) * (1.0 - (1.0 - PlOne_NIR_d * S0_over_s2) ** N_crowndiff)
-            Pc2_PAR_diff += w_dir * (s2 / (sr * sp)) * (1.0 - (1.0 - PlTwo_PAR_d * S0_over_s2) ** N_crowndiff)
-            Pc2_NIR_diff += w_dir * (s2 / (sr * sp)) * (1.0 - (1.0 - PlTwo_NIR_d * S0_over_s2) ** N_crowndiff)
+
+            Pc1_PAR_diff += Pc_diff_function(w_dir, s2, sr, sp, PlOne_PAR_d, S0_over_s2, N_crowndiff)
+            Pc1_NIR_diff += Pc_diff_function(w_dir, s2, sr, sp, PlOne_NIR_d, S0_over_s2, N_crowndiff)
+            Pc2_PAR_diff += Pc_diff_function(w_dir, s2, sr, sp, PlTwo_PAR_d, S0_over_s2, N_crowndiff)
+            Pc2_NIR_diff += Pc_diff_function(w_dir, s2, sr, sp, PlTwo_NIR_d, S0_over_s2, N_crowndiff)
+
 
     # ---- Diffuse contributions to soil and canopy ----
     Rs_diff = (IncPAR_diff * (1.0 - Pc1_PAR_diff) * (1.0 - rsoilv) +
@@ -545,5 +575,7 @@ def compute_binomial_prism_manuel(
     Rs_binomial = Rs_dir + Rs_diff
     Rc_binomial = Rc_dir + Rc_diff
 
+    Rs_binomial = np.asarray(Rs_binomial).reshape(ref_shape)
+    Rc_binomial = np.asarray(Rc_binomial).reshape(ref_shape)
     return Rc_binomial, Rs_binomial
 

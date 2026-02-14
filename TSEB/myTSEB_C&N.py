@@ -1,7 +1,5 @@
 import numpy as np
 import pandas as pd
-import csv
-import os
 
 import functions as myTSEB
 import pyTSEB.meteo_utils as met
@@ -10,25 +8,19 @@ from pyTSEB import MO_similarity as MO
 import pyTSEB.TSEB as TSEB
 from SALib.sample import saltelli
 from SALib.analyze import sobol
+from binomial_model.BinomialModelPrism_DirectandDiffuseRadiation import compute_binomial_prism_manuel
+from pyTSEB import net_radiation as rad
+import time
 
-# params = (pd.read_csv(rf'files/inputs_sensitivity_analysis.csv')
-#           .drop('Unnamed: 0', axis=1))
-#
-#
-# params = {col: params[col].to_numpy() for col in params.columns}
-
-# None Parameters
-ITERATIONS = 50
-# L = np.zeros(np.array(params['LAI']).shape) + np.inf
-max_iterations = ITERATIONS
 massman_profile = [0, []]
 
 G_constant = 0.1
 calcG_params = [[1], G_constant]
 G_ratio = 0.1
+const_L = None
 
 save_inputs = True
-T_MODEL = 'CN_H'
+T_MODEL = 'CN_R'
 
 FLAG_OK                = 0
 FLAG_NO_CONVERGENCE     = 1 << 0   # 1
@@ -39,6 +31,7 @@ FLAG_OPTICS_INVALID     = 1 << 4   # 16
 FLAG_LEV_NEGATIVE      = 1 << 5   # 32
 FLAG_LES_NEGATIVE      = 1 << 6   # 64
 FLAG_LETOTAL_NEGATIVE  = 1 << 7   # 128
+FLAG_AELES_NEGATIVE  = 1 << 8
 
 ########################################################################################################################
 # f_theta = fraction of incident beam radiation intercepted by the plant
@@ -47,21 +40,23 @@ FLAG_LETOTAL_NEGATIVE  = 1 << 7   # 128
 # myTSEB(LAI, fv, x_LAD, sza_rad)
 docker_inputs = []
 
-def sensitivity_analysis_myTSEB(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
-                                leaf_width, Trad_var, Tair, u,
-                                P_atm, ea, sza_degrees, G_ratio,
-                                emis_leaf, emis_soil, rho_vis_leaf, tau_vis_leaf,
-                                rho_nir_leaf, tau_nir_leaf, rho_vis_soil, rho_nir_soil,
-                                T_MODEL='CN_H', alpha_PT=1.26):
+def myTSEB_CN(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
+              leaf_width, Trad_var, Tair, u, plant_sep_var,
+              P_atm, ea, sza_degrees, G_ratio,
+              emis_leaf, emis_soil, rho_vis_leaf, tau_vis_leaf,
+              rho_nir_leaf, tau_nir_leaf, rho_vis_soil, rho_nir_soil,
+              T_MODEL='CN_R', alpha_PT=1.26):
 
-
-    global omega
     Trad = Tair + Trad_var
     z_u = h_V + 2
     z_T = h_V + 2
 
+    abs_vis_leaf = 1 - rho_vis_leaf - tau_vis_leaf
+    abs_nir_leaf = 1 - rho_nir_leaf - tau_nir_leaf
+
     sza_rad =  np.radians(sza_degrees)
     phi_rad = np.radians(phi_degrees)
+
     # vza_rad = np.radians(vza_degrees)
     # Campbell and Norman 1998. Page 172.
     m = 101.3 / (101.3 * np.cos(sza_rad))
@@ -79,6 +74,8 @@ def sensitivity_analysis_myTSEB(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
     K_be = myTSEB.estimate_Kbe(x_LAD, 0)
     fv02 = np.clip((1 - np.exp(-K_be * LAI)) * fv_var, 1e-6, 1)
     w_V = fv02 * row_sep
+    # plant_sep = row_sep * plant_sep_var  # sp [0.5, 1]
+
     F = np.asarray(LAI / fv02, dtype=np.float32)
 
     c_p = met.calc_c_p(P_atm, ea)
@@ -90,27 +87,39 @@ def sensitivity_analysis_myTSEB(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
     #  z0_soil) = myTSEB.get_emiss_rho_tau(LAI)
     z0_soil = np.full(LAI.shape, 0.01)
 
+    Omega0 = TSEB.CI.calc_omega0_Kustas(
+        LAI,
+        fv02,
+        x_LAD=x_LAD,
+        isLAIeff=False
+    )
+
     if T_MODEL == 'CN_H':
-        omega = myTSEB.off_nadir_clumpling_index_Kustas_Norman(
-            LAI,
-            fv02,
-            h_V,
-            w_V,
-            x_LAD,
-            sza_rad
+        # omega = myTSEB.off_nadir_clumpling_index_Kustas_Norman(
+        #     LAI,
+        #     fv02,
+        #     h_V,
+        #     w_V,
+        #     x_LAD,
+        #     sza_rad
+        # )
+
+        omega = TSEB.CI.calc_omega_Kustas(
+            Omega0,
+            sza_degrees,
+            w_C= w_V / h_V
         )
     elif T_MODEL == 'CN_R':
-        omega = myTSEB.rectangular_row_clumping_index_parry(
-            LAI=LAI,
-            fv0=fv02,
-            w_V=w_V,
-            h_V=h_V,
-            sza=sza_rad,
-            phi=phi_rad,
-            hb_V=0,
-            L=None,
-            x_LAD=1
+        omega = TSEB.CI.calc_omega_rows(
+            LAI,
+            fv02,
+            theta=sza_degrees,
+            psi=phi_degrees,
+            w_c=w_V / h_V,
+            x_lad=x_LAD,
+            is_lai_eff=False
         )
+        # omega = np.full_like(LAI, 1)
     else:
         omega = np.full_like(LAI, 1)
 
@@ -173,64 +182,13 @@ def sensitivity_analysis_myTSEB(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
     # Fist Net Radiation estimation assuming Trad_V = Tair
     # This first estimation of Trad_S will be used to estimate R_S, Ln_S and R_S
     ########################################################################################################################
-    Trad_V0 = np.min([Tair, Trad], axis=0) # We set the first Trad_V equal to Tair, under potential ET conditions.
-    Trad_S0 = myTSEB.estimate_Trad_S(
+    Trad_V = np.min([Tair, Trad], axis=0) # We set the first Trad_V equal to Tair, under potential ET conditions.
+    Trad_S = myTSEB.estimate_Trad_S(
         Trad=Trad,
-        Trad_V=Trad_V0,
+        Trad_V=Trad_V,
         f_theta=f_theta
     )
     # params.update({'Trad_S_0': Trad_S_0})
-
-    R_A, R_x, R_S = TSEB.calc_resistances(
-        resistance_form,
-        {
-            "R_A": {
-                "z_T": z_T,
-                "u_friction": u_friction,
-                "L": L,
-                "d_0": d_0,
-                "z_0H": z_0H,
-            },
-            "R_x": {
-                "u_friction": u_friction,
-                "h_C": h_V,
-                "d_0": d_0,
-                "z_0M": z_0m,
-                "L": L,
-                "F": F,
-                "LAI": LAI,
-                "leaf_width": leaf_width,
-                "z0_soil": z0_soil,
-                "massman_profile": massman_profile,
-                "res_params": {k: res_params[k] for k in res_params.keys()},
-            },
-            "R_S": {
-                "u_friction": u_friction,
-                "h_C": h_V,
-                "d_0": d_0,
-                "z_0M": z_0m,
-                "L": L,
-                "F": F,
-                "omega0": omega,
-                "LAI": LAI,
-                "leaf_width": leaf_width,
-                "z0_soil": z0_soil,
-                "z_u": z_u,
-                "deltaT": Trad_S0 - T_AC,
-                "u": u,
-                "rho": rho,
-                "c_p": c_p,
-                "f_cover": fv02,
-                "w_C": w_V,
-                "massman_profile": massman_profile,
-                "res_params": {k: res_params[k] for k in res_params.keys()},
-            },
-        },
-    )
-
-    if np.any(np.array([R_A, R_x, R_S])<=0):
-        print([R_A, R_x, R_S])
-
     difvis, difnir, fvis, fnir = TSEB.rad.calc_difuse_ratio(
         S_dn=Sdn,
         sza=sza_degrees,
@@ -248,8 +206,8 @@ def sensitivity_analysis_myTSEB(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
         fnir=fnir,
         sza=sza_degrees,
         LAI=LAI,
-        Trad_S=Trad_S0,
-        Trad_V=Trad_V0,
+        Trad_S=Trad_S,
+        Trad_V=Trad_V,
         Tair=Tair,
         ea=ea,
         P_atm=P_atm,
@@ -263,13 +221,35 @@ def sensitivity_analysis_myTSEB(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
         rho_nir_soil=rho_nir_soil,
         emis_leaf=emis_leaf,
         emis_soil=emis_soil)
+
     # Rn_V0 = np.array(np.clip(Rn_V0, -150, 1000))
     # Rn_S0 = np.array(np.clip(Rn_S0, -150, 1000))
 
     # Rn_V0_copy = Rn_V0.copy()
     # Rn_S0_copy = Rn_S0.copy()
+    L_dn = rad.calc_longwave_irradiance(
+        ea,
+        Tair,
+        p=P_atm,
+        z_T=z_T,
+        h_C=h_V
+    )
 
-    [LE_V, LE_S, LE_total, H_V, H_S, Trad_V, Trad_S, Rn_V, Rn_S, G] = [np.full_like(LAI, -9999) for i in range(10)]
+    Ln_V, Ln_S = rad.calc_L_n_Campbell(
+        T_C=Trad_V,
+        T_S=Trad_S,
+        L_dn=L_dn,
+        lai=LAI,
+        emisVeg=emis_leaf,
+        emisGrd=emis_soil,
+        x_LAD=x_LAD
+    )
+
+    Rn_V0 = Sn_V + Ln_V
+    Rn_S0 = Sn_S + Ln_S
+
+    [LE_V, LE_S, LE, H_V, H_S, H, G, Ln_V, Ln_S, Rn_V, Rn_S, R_A, R_x, R_S, AELE_S] = [np.full_like(LAI, -9999)
+                                                                                       for i in range(15)]
 
     loop_con = np.full_like(LAI, True, dtype=bool)
     max_iterations = 14
@@ -277,33 +257,81 @@ def sensitivity_analysis_myTSEB(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
     # alpha_condition = np.any(alpha_PT > 0)
     flag = np.full_like(LAI, FLAG_OK)
 
-    Rn_V0_copy, Rn_S0_copy = Rn_V0.copy(), Rn_S0.copy()
+    # Rn_V0_copy, Rn_S0_copy = Rn_V0.copy(), Rn_S0.copy()
     while (np.any(loop_con) and iterations <= max_iterations) :
         # print(iterations)
         # while len(loop_con)>0:
         # print(loop_con))
         # print('Iteration', iterations)
 
+        R_A[loop_con], R_x[loop_con], R_S[loop_con] = TSEB.calc_resistances(
+            resistance_form,
+            {
+                "R_A": {
+                    "z_T": z_T[loop_con],
+                    "u_friction": u_friction[loop_con],
+                    "L": L[loop_con],
+                    "d_0": d_0[loop_con],
+                    "z_0H": z_0H[loop_con],
+                },
+                "R_x": {
+                    "u_friction": u_friction[loop_con],
+                    "h_C": h_V[loop_con],
+                    "d_0": d_0[loop_con],
+                    "z_0M": z_0m[loop_con],
+                    "L": L[loop_con],
+                    "F": F[loop_con],
+                    "LAI": LAI[loop_con],
+                    "leaf_width": leaf_width[loop_con],
+                    "z0_soil": z0_soil[loop_con],
+                    "massman_profile": massman_profile,
+                    "res_params": {k: res_params[k] for k in res_params.keys()},
+                },
+                "R_S": {
+                    "u_friction": u_friction[loop_con],
+                    "h_C": h_V[loop_con],
+                    "d_0": d_0[loop_con],
+                    "z_0M": z_0m[loop_con],
+                    "L": L[loop_con],
+                    "F": F[loop_con],
+                    "omega0": Omega0[loop_con],
+                    "LAI": LAI[loop_con],
+                    "leaf_width": leaf_width[loop_con],
+                    "z0_soil": z0_soil[loop_con],
+                    "z_u": z_u[loop_con],
+                    "deltaT": Trad_S[loop_con] - T_AC[loop_con],
+                    "u": u[loop_con],
+                    "rho": rho[loop_con],
+                    "c_p": c_p[loop_con],
+                    "f_cover": fv02[loop_con],
+                    "w_C": w_V[loop_con] / h_V[loop_con],
+                    "massman_profile": massman_profile,
+                    "res_params": {k: res_params[k] for k in res_params.keys()},
+                },
+            },
+        )
+
+        ########################################################################################################################
+        # Estimate Net Radiation estimation with Trad_V and Trad_S from Sensible Heat Flux
+        ########################################################################################################################
+        if iterations == 1:
+            Rn_V[loop_con] = Rn_V0[loop_con]
+            Rn_S[loop_con] = Rn_S0[loop_con]
+        else:
+            Rn_V[loop_con] = Sn_V[loop_con] + Ln_V[loop_con]
+            Rn_S[loop_con] = Sn_S[loop_con] + Ln_S[loop_con]
+
         # alpha_PT = np.where(alpha_PT < 0, 0, alpha_PT)
-
-        if iterations > 1:
-            Rn_V0, Rn_S0 = Rn_V, Rn_S
-
         LE_V[loop_con] = myTSEB.Priestly_Taylor_LE_V(
-            fv_g=f_theta[loop_con],
-            Rn_V=Rn_V0[loop_con],
+            fv_g=1, #np.full_like(f_theta[loop_con], 1),
+            Rn_V=Rn_V[loop_con], # This change after every loop
             alpha_PT=alpha_PT[loop_con],
             Tair=Tair[loop_con],
             P_atm=P_atm[loop_con],
             c_p=c_p[loop_con]
         )
 
-
-        H_V[loop_con] = Rn_V0[loop_con] - LE_V[loop_con]
-        # print(rf'Alpha: {alpha_PT}, Rn_V0: {Rn_V0}, H_V: {H_V}')
-
-        # print(alpha_PT)
-        # print(LE_V)
+        H_V[loop_con] = Rn_V[loop_con] - LE_V[loop_con]
 
         ########################################################################################################################
         # Reestimate of Trad_V and Trad_S using Sensible Heat Flux
@@ -329,6 +357,19 @@ def sensitivity_analysis_myTSEB(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
         flag_RAD_INCONSISTENCY_test = np.isnan(Trad_S)
         flag[flag_RAD_INCONSISTENCY_test] = FLAG_RAD_INCONSISTENCY
 
+        Ln_V[loop_con], Ln_S[loop_con] = rad.calc_L_n_Campbell(
+            T_C=Trad_V[loop_con],
+            T_S=Trad_S[loop_con],
+            L_dn=L_dn[loop_con],
+            lai=LAI[loop_con],
+            emisVeg=emis_leaf[loop_con],
+            emisGrd=emis_soil[loop_con],
+            x_LAD=x_LAD[loop_con]
+        )
+
+        Rn_V[loop_con] = Sn_V[loop_con] + Ln_V[loop_con]
+        Rn_S[loop_con] = Sn_S[loop_con] + Ln_S[loop_con]
+
         # print(rf'Alpha: {alpha_PT}, Trad_S: {Trad_S}, Trad_V: {Trad_V}')
         # print(Trad_S)
         ########################################################################################################################
@@ -344,17 +385,17 @@ def sensitivity_analysis_myTSEB(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
                     "z_0M": z_0m[loop_con],
                     "L": L[loop_con],
                     "F": F[loop_con],
-                    "omega0": omega[loop_con],
+                    "omega0": Omega0[loop_con],
                     "LAI": LAI[loop_con],
                     "leaf_width": leaf_width[loop_con],
                     "z0_soil": z0_soil[loop_con],
                     "z_u": z_u[loop_con],
-                    "deltaT": Trad_S[loop_con] - T_AC[loop_con],  # Trad_S - T_AC
+                    "deltaT": Trad_S[loop_con] - T_AC[loop_con],
                     "u": u[loop_con],
                     "rho": rho[loop_con],
                     "c_p": c_p[loop_con],
                     "f_cover": fv02[loop_con],
-                    "w_C": w_V[loop_con],
+                    "w_C": w_V[loop_con] / h_V[loop_con],
                     "massman_profile": massman_profile,
                     "res_params": {k: res_params[k] for k in res_params.keys()},
                 }
@@ -371,50 +412,51 @@ def sensitivity_analysis_myTSEB(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
         H_S[loop_con] = rho[loop_con] * c_p[loop_con] * (Trad_S[loop_con] - T_AC[loop_con]) / R_S[loop_con]
 
         ########################################################################################################################
-        # Reestimate Net Radiation estimation with Trad_V and Trad_S from Sensible Heat Flux
-        ########################################################################################################################
-        _, _, Rn_V[loop_con], Rn_S[loop_con] = myTSEB.estimate_Rn(
-            Sdn_dir=Sdn_dir[loop_con],
-            Sdn_dif=Sdn_dif[loop_con],
-            fvis=fvis[loop_con],
-            fnir=fnir[loop_con],
-            sza=sza_degrees[loop_con],
-            LAI=LAI[loop_con],
-            Trad_S=Trad_S[loop_con],
-            Trad_V=Trad_V[loop_con],
-            Tair=Tair[loop_con],
-            ea=ea[loop_con],
-            P_atm=P_atm[loop_con],
-            omega=omega[loop_con],
-            x_LAD=x_LAD[loop_con],
-            rho_vis_leaf=rho_vis_leaf[loop_con],
-            rho_nir_leaf=rho_nir_leaf[loop_con],
-            tau_vis_leaf=tau_vis_leaf[loop_con],
-            tau_nir_leaf=tau_nir_leaf[loop_con],
-            rho_vis_soil=rho_vis_soil[loop_con],
-            rho_nir_soil=rho_nir_soil[loop_con],
-            emis_leaf=emis_leaf[loop_con],
-            emis_soil=emis_soil[loop_con])
-
-        ########################################################################################################################
         # Compute Soil Heat Flux Ratio as a Ratio of Rn_S
+        # In first iteration, initial Rn_V and Rn_S is used to keep consistency in the use th initial Rn_V and Rn_S
+        # to estimate H_V and H_S.
         ########################################################################################################################
         G[loop_con] = G_ratio[loop_con] * Rn_S[loop_con]
 
+        H[loop_con] = H_V[loop_con] + H_S[loop_con]
         LE_S[loop_con] = Rn_S[loop_con] - G[loop_con] - H_S[loop_con]
         LE_V[loop_con] = Rn_V[loop_con] - H_V[loop_con]
-        LE_total[loop_con] = LE_V[loop_con] + LE_S[loop_con]
+        LE[loop_con] = LE_V[loop_con] + LE_S[loop_con]
         # print(rf'LE_S: {LE_S}')
 
         alpha_PT[loop_con] = np.maximum(alpha_PT[loop_con] - 0.1, 0.0)
-        iterations += 1
 
         # alpha_condition = alpha_PT > 0
-        loop_con = LE_S < 0
+        AELE_S[loop_con] = (1.0 - G_ratio[loop_con]) * Rn_S[loop_con]
 
-        if np.any(np.isnan(LE_S)):
-            # WHY IS RETRIVING NAN VALUES
-            continue
+        con_LE_S = (LE_S < 0)
+        con_AE_pos = (AELE_S > 0)
+        con_AE_neg = (AELE_S < 0)
+
+        # Flag physically negative available energy
+        flag[con_AE_neg] = FLAG_AELES_NEGATIVE
+
+        loop_con = con_LE_S & con_AE_pos
+
+        if const_L is None:
+            L[loop_con] = MO.calc_L(
+                u_friction[loop_con],
+                Tair[loop_con],
+                rho[loop_con],
+                c_p[loop_con],
+                H[loop_con],
+                LE[loop_con])
+            # Calculate again the friction velocity with the new stability
+            # correctios
+            u_friction[loop_con] = MO.calc_u_star(
+                u[loop_con], z_u[loop_con], L[loop_con], d_0[loop_con], z_0m[loop_con])
+            u_friction[loop_con] = np.asarray(np.maximum(U_FRICTION_MIN[loop_con], u_friction[loop_con]), dtype=np.float32)
+
+        # only evaluate where AE_S > 0 to avoid nonsense division
+
+        iterations += 1
+        # print(np.where(loop_con)[0].shape)
+        # print("L_dn:", np.nanmin(L_dn), np.nanmean(L_dn), np.nanmax(L_dn))
 
 
     flag_NO_CONVERGENCE_test = LE_S < 0
@@ -426,23 +468,21 @@ def sensitivity_analysis_myTSEB(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
     flag_LEV_NEGATIVE_test = LE_V < 0
     flag[flag_LEV_NEGATIVE_test] = FLAG_LEV_NEGATIVE
 
-    flag_LETOTAL_NEGATIVE_test = LE_total < 0
+    flag_LETOTAL_NEGATIVE_test = LE < 0
     flag[flag_LETOTAL_NEGATIVE_test] = FLAG_LETOTAL_NEGATIVE
 
-    return LE_V, LE_S, LE_total, omega, Sn_V, Sn_S, Rn_V0_copy, Rn_S0_copy, Rn_V, Rn_S, Trad_V, Trad_S, f_theta, flag
+    return omega, f_theta, Sn_V, Sn_S, Trad_V, Trad_S, Ln_V, Ln_S, Rn_V, Rn_S, LE_V, LE_S, flag
 #
 
-
-# Independent base inputs only
 names = [
         "LAI", "fv_var", "h_V", "row_sep", "x_LAD", 'phi_degrees',
-        "leaf_width", "Trad_var", "Tair", "u",
+        "leaf_width", "Trad_var", "Tair", "u", "plant_sep_var",
         "P_atm", "ea", "sza_degrees", 'G_ratio',
         'emis_leaf', 'emis_soil', 'rho_vis_leaf', 'tau_vis_leaf',
         'rho_nir_leaf', 'tau_nir_leaf', 'rho_vis_soil', 'rho_nir_soil']
 
 problem = {
-    "num_vars": 22,
+    "num_vars": 23,
     "names": names,
     "bounds": [
         [0.2, 5],  # 1. LAI
@@ -455,29 +495,32 @@ problem = {
         [-2, 5],  # 8. Trad = Tair + Trad_var  (Tair 283–313, diff 0–15 → max = 328)
         [283, 313],  # 9. Tair (kelvin)
         [0.2, 5],  # 10. u (m s-1)
-        [990, 1010],  # 11. P_atm (mb)
-        [5, 35],  # 12. ea (mb)
-        [15, 65],  # 13. sza_degrees
-        [0.01, 0.4], # 14. G_ratio
-        [0.96, 0.99],  # 15. emis_leaf
-        [0.90, 0.98],  # 16. emis_soil
-        [0.03, 0.18],  # 17. rho_vis_leaf
-        [0.02, 0.10],  # 18. tau_vis_leaf
-        [0.32, 0.55],  # 19. rho_nir_leaf (tightened)
-        [0.25, 0.45],  # 20. tau_nir_leaf (tightened)
-        [0.05, 0.30],  # 21. rho_vis_soil
-        [0.20, 0.45],  # 22. rho_nir_soil
+        [0.5, 1],  # 5. 11. plant_sep_var: plant space in relation to sr
+        [990, 1010],  # 12. P_atm (mb)
+        [5, 35],  # 13. ea (mb)
+        [15, 65],  # 14. sza_degrees
+        [0.34, 0.36], # 15. G_ratio
+        [0.96, 0.99],  # 16. emis_leaf
+        [0.90, 0.98],  # 17. emis_soil
+        [0.03, 0.18],  # 18. rho_vis_leaf
+        [0.02, 0.10],  # 19. tau_vis_leaf
+        [0.32, 0.55],  # 20. rho_nir_leaf (tightened)
+        [0.25, 0.45],  # 21. tau_nir_leaf (tightened)
+        [0.05, 0.30],  # 22. rho_vis_soil
+        [0.20, 0.45],  # 23. rho_nir_soil
 ]
 }
 
-N = 5000
+
+N = 1000
 second_order = False
 X = saltelli.sample(problem, N, calc_second_order=second_order)
 
 inputs_dict = {f"{names[i]}": X[:, i:i+1] for i in range(X.shape[1])}
 
-LE_V, LE_S, LE_total, omega, Sn_V, Sn_S, Rn_V0_copy, Rn_S0_copy, Rn_V, Rn_S, Trad_V, Trad_S, f_theta, flag = (
-    sensitivity_analysis_myTSEB(
+start_time = time.perf_counter()
+omega, f_theta, Sn_V, Sn_S, Trad_V, Trad_S, Ln_V, Ln_S, Rn_V, Rn_S, LE_V, LE_S, flag = (
+    myTSEB_CN(
         LAI=inputs_dict['LAI'],
         fv_var=inputs_dict['fv_var'],
         h_V=inputs_dict['h_V'],
@@ -487,13 +530,12 @@ LE_V, LE_S, LE_total, omega, Sn_V, Sn_S, Rn_V0_copy, Rn_S0_copy, Rn_V, Rn_S, Tra
         leaf_width=inputs_dict['leaf_width'],
         Trad_var=inputs_dict['Trad_var'],
         Tair=inputs_dict['Tair'],
-        # Sdn=inputs_dict['Sdn'],
         u=inputs_dict['u'],
+        plant_sep_var=inputs_dict['plant_sep_var'],
         P_atm=inputs_dict['P_atm'],
         ea=inputs_dict['ea'],
         sza_degrees=inputs_dict['sza_degrees'],
         G_ratio=inputs_dict['G_ratio'],
-        # row_azimuth=inputs_dict['row_azimuth'],
         emis_leaf=inputs_dict['emis_leaf'],
         emis_soil=inputs_dict['emis_soil'],
         rho_vis_leaf=inputs_dict['rho_vis_leaf'],
@@ -506,33 +548,37 @@ LE_V, LE_S, LE_total, omega, Sn_V, Sn_S, Rn_V0_copy, Rn_S0_copy, Rn_V, Rn_S, Tra
         alpha_PT=1.26
     )
 )
+end_time = time.perf_counter()
+elapsed_time = end_time - start_time
+print(f"Execution time TSEB B&N: {elapsed_time} seconds")
 
-inputs_df = pd.DataFrame(X)
-inputs_df.columns = names
+df_inputs = pd.DataFrame(X)
+df_inputs.columns = names
 
-inputs_df.loc[:, 'omega'] = omega
-inputs_df.loc[:, 'LE_V'] = LE_V
-inputs_df.loc[:, 'LE_S'] = LE_S
-inputs_df.loc[:, 'LE_total'] = LE_total
+df_inputs.loc[:, 'omega_CN'] = omega
+df_inputs.loc[:, 'f_theta_CN'] = f_theta
+df_inputs.loc[:, 'Sn_V_CN'] = Sn_V
+df_inputs.loc[:, 'Sn_S_CN'] = Sn_S
+df_inputs.loc[:, 'Trad_V_CN'] = Trad_V
+df_inputs.loc[:, 'Trad_S_CN'] = Trad_S
+df_inputs.loc[:, 'Ln_V_CN'] = Ln_V
+df_inputs.loc[:, 'Ln_S_CN'] = Ln_S
+df_inputs.loc[:, 'Rn_V_CN'] = Rn_V
+df_inputs.loc[:, 'Rn_S_CN'] = Rn_S
+df_inputs.loc[:, 'LE_V_CN'] = LE_V
+df_inputs.loc[:, 'LE_S_CN'] = LE_S
 
-inputs_df.loc[:, 'Sn_V'] = Sn_V
-inputs_df.loc[:, 'Sn_S'] = Sn_S
+df_inputs.loc[:, 'flag_CN'] = flag
 
-inputs_df.loc[:, 'Rn_V0'] = Rn_V0_copy
-inputs_df.loc[:, 'Rn_S0'] = Rn_S0_copy
+df_inputs.to_csv('files/TSEB_CN.csv')
 
-inputs_df.loc[:, 'Rn_V'] = Rn_V
-inputs_df.loc[:, 'Rn_S'] = Rn_S
-
-inputs_df.loc[:, 'Trad_V'] = Trad_V
-inputs_df.loc[:, 'Trad_S'] = Trad_S
-inputs_df.loc[:, 'f_theta'] = f_theta
-# inputs_df.to_csv()
-
-
+LE = LE_V + LE_S
 Si_LE_V = sobol.analyze(problem, LE_V[:, 0], calc_second_order=second_order, print_to_console=False)
 Si_LE_S = sobol.analyze(problem, LE_S[:, 0], calc_second_order=second_order, print_to_console=False)
-Si_LE_total = sobol.analyze(problem, LE_total[:, 0], calc_second_order=second_order, print_to_console=False)
+Si_LE_total = sobol.analyze(problem, LE[:, 0], calc_second_order=second_order, print_to_console=False)
+
+Si_Sn_V = sobol.analyze(problem, Sn_V[:, 0], calc_second_order=second_order, print_to_console=False)
+Si_Sn_S = sobol.analyze(problem, Sn_S[:, 0], calc_second_order=second_order, print_to_console=False)
 
 Si_Rn_V = sobol.analyze(problem, Rn_V[:, 0], calc_second_order=second_order, print_to_console=False)
 Si_Rn_S = sobol.analyze(problem, Rn_S[:, 0], calc_second_order=second_order, print_to_console=False)
@@ -542,23 +588,26 @@ Si_Trad_S = sobol.analyze(problem, Trad_S[:, 0], calc_second_order=second_order,
 
 Si_f_theta = sobol.analyze(problem, f_theta[:, 0], calc_second_order=second_order, print_to_console=False)
 
-
 def si_to_df(si):
     df_si = pd.DataFrame(si)
     df_si.insert(0, 'params', problem['names'])
     return df_si
 
-df_Si_LE_V, df_Si_LE_S, df_Si_LE_total, df_Si_Rn_V, df_Si_Rn_S, df_Si_Trad_V, df_Si_Trad_S, df_Si_f_theta= \
-    [si_to_df(x) for x in [Si_LE_V, Si_LE_S, Si_LE_total, Si_Rn_V, Si_Rn_S, Si_Trad_V, Si_Trad_S, Si_f_theta]
+(df_Si_LE_V, df_Si_LE_S, df_Si_LE_total, df_Si_Sn_V, df_Si_Sn_S, df_Si_Rn_V, df_Si_Rn_S, df_Si_Trad_V, df_Si_Trad_S,
+ df_Si_f_theta)= [si_to_df(x) for x in [Si_LE_V, Si_LE_S, Si_LE_total, Si_Sn_V, Si_Sn_S, Si_Rn_V, Si_Rn_S,
+                                        Si_Trad_V, Si_Trad_S, Si_f_theta]
      ]
 
 # Rn_V, Rn_S
-path = 'files/TSEB_CN.xlsx'
+path = 'files/sensitivity_analysis_TSEB_CN.xlsx'
 with pd.ExcelWriter(path, engine='xlsxwriter') as writer:
-    inputs_df.to_excel(writer, sheet_name='inputs', index=False)
+    # df_inputs.to_excel(writer, sheet_name='inputs', index=False)
     df_Si_LE_V.to_excel(writer, sheet_name='LE_V', index=False)
     df_Si_LE_S.to_excel(writer, sheet_name='LE_S', index=False)
     df_Si_LE_total.to_excel(writer, sheet_name='LE_total', index=False)
+
+    df_Si_Sn_V.to_excel(writer, sheet_name='Sn_V', index=False)
+    df_Si_Sn_S.to_excel(writer, sheet_name='Sn_S', index=False)
 
     df_Si_Rn_V.to_excel(writer, sheet_name='Rn_V', index=False)
     df_Si_Rn_S.to_excel(writer, sheet_name='Rn_S', index=False)
@@ -566,144 +615,3 @@ with pd.ExcelWriter(path, engine='xlsxwriter') as writer:
     df_Si_Trad_V.to_excel(writer, sheet_name='Trad_V', index=False)
     df_Si_Trad_S.to_excel(writer, sheet_name='Trad_S', index=False)
     df_Si_f_theta.to_excel(writer, sheet_name='f_theta', index=False)
-
-
-"""
-# 3) Evaluate the model for each row of X
-def model_from_iso(row):
-    (LAI, fv_var, h_V, row_sep, x_LAD,
-     leaf_width, Trad_var, Tair, Sdn, u,
-     P_atm, ea, sza_degrees, saa_degrees, G_ratio,
-     row_azimuth, emis_leaf, emis_soil, rho_vis_leaf, tau_vis_leaf,
-     rho_nir_leaf, tau_nir_leaf, rho_vis_soil, rho_nir_soil) = row
-
-    if (rho_vis_leaf + tau_vis_leaf >= 1) or (rho_nir_leaf + tau_nir_leaf >= 1):
-        return np.nan, np.nan, np.nan, 16
-
-    return sensitivity_analysis_myTSEB(LAI, fv_var, h_V, row_sep, x_LAD,
-                                       leaf_width, Trad_var, Tair, Sdn, u,
-                                       P_atm, ea, sza_degrees, saa_degrees, G_ratio,
-                                       row_azimuth, emis_leaf, emis_soil, rho_vis_leaf, tau_vis_leaf,
-                                       rho_nir_leaf, tau_nir_leaf, rho_vis_soil, rho_nir_soil, T_MODEL=T_MODEL)
-
-
-
-D = problem["num_vars"]
-block_size = (2 * D + 2) if second_order else (D + 2)
-assert X.shape[0] % block_size == 0
-N_blocks = X.shape[0] // block_size
-
-# lists of kept scalar outputs, block-by-block
-Y_blocks = {k: [] for k in ["LE_total","LEV","LES","Rn_V","Rn_S","Trad_V","Trad_S","f_theta","fail"]}
-
-def is_ok(flag, vals):
-    # flag is scalar or array
-    flag_ok = np.all(np.asarray(flag) == 0)
-    vals_ok = np.all(np.isfinite(vals))
-    return flag_ok and vals_ok
-
-kept = 0
-dropped = 0
-
-for b in range(N_blocks):
-    rows = X[b*block_size:(b+1)*block_size]
-
-    block = {k: np.empty(block_size, dtype=float) for k in Y_blocks.keys()}
-    block_ok = True
-
-    for j, row in enumerate(rows):
-        out = model_from_iso(row)
-
-        # expected: LE_V, LE_S, LE_total, Rn_V, Rn_S, Trad_V, Trad_S, f_theta, flag
-        LE_V, LE_S, LE_total, Rn_V, Rn_S, Trad_V, Trad_S, f_theta, flag = out
-
-        mLEV      = np.nanmean(LE_V)
-        mLES      = np.nanmean(LE_S)
-        mLE_total = np.nanmean(LE_total)
-        mRn_V     = np.nanmean(Rn_V)
-        mRn_S     = np.nanmean(Rn_S)
-        mTrad_V   = np.nanmean(Trad_V)
-        mTrad_S   = np.nanmean(Trad_S)
-        mf_theta  = np.nanmean(f_theta)
-
-        vals = [mLE_total, mLEV, mLES, mRn_V, mRn_S, mTrad_V, mTrad_S, mf_theta]
-
-        ok = is_ok(flag, vals)
-
-        if not ok:
-            block_ok = False
-            break
-
-        block["LE_total"][j] = mLE_total
-        block["LEV"][j]      = mLEV
-        block["LES"][j]      = mLES
-        block["Rn_V"][j]     = mRn_V
-        block["Rn_S"][j]     = mRn_S
-        block["Trad_V"][j]   = mTrad_V
-        block["Trad_S"][j]   = mTrad_S
-        block["f_theta"][j]  = mf_theta
-        block["fail"][j]     = 0.0  # all ok in kept blocks
-
-    if block_ok:
-        for k in Y_blocks:
-            Y_blocks[k].append(block[k])
-        kept += 1
-    else:
-        dropped += 1
-
-if kept == 0:
-    raise RuntimeError("No valid Saltelli blocks kept. Cannot run Sobol.")
-
-# Concatenate kept blocks (length = kept * block_size)
-Y = {k: np.concatenate(Y_blocks[k]) for k in Y_blocks}
-
-print(f"Kept blocks: {kept}/{N_blocks} ({100*kept/N_blocks:.1f}%)")
-print(f"Y length: {Y['LE_total'].size} (must be divisible by {block_size})")
-
-# Now Sobol works because Y has correct Saltelli length/structure
-Si_LE_total = sobol.analyze(problem, Y["LE_total"], calc_second_order=False)
-Si_LEV      = sobol.analyze(problem, Y["LEV"],      calc_second_order=False)
-Si_LES      = sobol.analyze(problem, Y["LES"],      calc_second_order=False)
-Si_Rn_V     = sobol.analyze(problem, Y["Rn_V"],     calc_second_order=False)
-Si_Rn_S     = sobol.analyze(problem, Y["Rn_S"],     calc_second_order=False)
-Si_Trad_V   = sobol.analyze(problem, Y["Trad_V"],   calc_second_order=False)
-Si_Trad_S   = sobol.analyze(problem, Y["Trad_S"],   calc_second_order=False)
-Si_f_theta  = sobol.analyze(problem, Y["f_theta"],  calc_second_order=False)
-
-path = r'files/sensitivity_analysis_{}_5000.xlsx'.format(T_MODEL)
-
-def si_to_table(data, problem):
-    df = pd.DataFrame(data)
-    df.insert(0, 'params', problem['names'])
-    return df
-si_tables = [si_to_table(df, problem) for df in [Si_LE_total, Si_LEV, Si_LES, Si_Rn_V, Si_Rn_S,
-                                                    Si_Trad_V, Si_Trad_S, Si_f_theta]]
-names_outcomes = ['LE_total', 'Si_LEV', 'Si_LES', 'Si_Rn_V', 'Si_Rn_S', 'Si_Trad_V', 'Si_Trad_S', 'Si_f_theta']
-# [si_tables[x].to_excel(path, sheet_name=names[x]) for x in range(0, len(si_tables))]
-with pd.ExcelWriter(path, engine='xlsxwriter') as writer:
-    si_tables[0].to_excel(writer, sheet_name=names_outcomes[0], index=False)
-    si_tables[1].to_excel(writer, sheet_name=names_outcomes[1], index=False)
-    si_tables[2].to_excel(writer, sheet_name=names_outcomes[2], index=False)
-    si_tables[3].to_excel(writer, sheet_name=names_outcomes[3], index=False)
-    si_tables[4].to_excel(writer, sheet_name=names_outcomes[4], index=False)
-    si_tables[5].to_excel(writer, sheet_name=names_outcomes[5], index=False)
-    si_tables[6].to_excel(writer, sheet_name=names_outcomes[6], index=False)
-    si_tables[7].to_excel(writer, sheet_name=names_outcomes[7], index=False)
-    # si_tables[8].to_excel(writer, sheet_name=names[8], index=False)
-
-
-df_inputs = pd.DataFrame(X)
-df_inputs.columns = names
-df_inputs.loc[:, 'LEV'] = Y_LEV
-df_inputs.loc[:, 'LES'] = Y_LES
-df_inputs.loc[:, 'LE_total'] = Y_LE_total
-df_inputs.loc[:, 'flag'] = Y_flag
-
-path = r'files/inputs_sensitivity_analysis_{}.csv'.format(T_MODEL)
-df_inputs.to_csv(path)
-
-#
-for n, s1, st, c1, ct in zip(problem["names"], Si_LE_total["S1"], Si_LE_total["ST"], Si_LE_total["S1_conf"],
-                             Si_LE_total["ST_conf"]):
-    print(f"{n:>12s} | S1={s1:.3f} (±{c1:.3f})  ST={st:.3f} (±{ct:.3f})")
-"""
