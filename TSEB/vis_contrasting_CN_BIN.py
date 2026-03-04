@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 import numpy as np
 from scipy.stats import gaussian_kde
+import matplotlib.ticker as tck
 
 folder = rf'C:\Users\mqalborn\Desktop\BiophysicalTraitsSAT\TSEB\files'
 df_CN = pd.read_csv(folder + '/TSEB_CN.csv')
@@ -11,16 +12,26 @@ df_BIN = pd.read_csv(folder + '/TSEB_BINOMIAL.csv')
 df_CN.rename(columns={'Unnamed: 0':'index', 'LAI':'LAI_CN'}, inplace=True)
 df_BIN.rename(columns={'Unnamed: 0':'index', 'LAI':'LAI_BIN'}, inplace=True)
 
-df_CN = df_CN[['index','LAI_CN', 'omega_CN', 'f_theta_CN', 'Sn_V_CN', 'Sn_S_CN', 'Trad_V_CN', 'Trad_S_CN', 'Ln_V_CN',
+df_CN = df_CN[['index','LAI_CN', 'Sdn_CN', 'f_theta_CN', 'Sn_V_CN', 'Sn_S_CN', 'Trad_V_CN', 'Trad_S_CN', 'Ln_V_CN',
                'Ln_S_CN','Rn_V_CN', 'Rn_S_CN', 'LE_V_CN', 'LE_S_CN']]
 df_CN.loc[:, 'LE_CN'] = df_CN['LE_V_CN'] + df_CN['LE_S_CN']
 df_CN.loc[:, 'Sn_CN'] = df_CN['Sn_V_CN'] + df_CN['Sn_S_CN']
 
-df_BIN = df_BIN[['index', 'LAI_BIN', 'omega_BIN', 'f_theta_BIN', 'Sn_V_BIN', 'Sn_S_BIN', 'Trad_V_BIN', 'Trad_S_BIN',
+df_BIN = df_BIN[['index', 'LAI_BIN', 'Sdn_BIN', 'f_theta_BIN', 'Sn_V_BIN', 'Sn_S_BIN', 'Trad_V_BIN', 'Trad_S_BIN',
                  'Ln_V_BIN', 'Ln_S_BIN', 'Rn_V_BIN', 'Rn_S_BIN', 'LE_V_BIN', 'LE_S_BIN']]
 df_BIN.loc[:, 'LE_BIN'] = df_BIN['LE_V_BIN'] + df_BIN['LE_S_BIN']
 df_BIN.loc[:, 'Sn_BIN'] = df_BIN['Sn_V_BIN'] + df_BIN['Sn_S_BIN']
 df = pd.merge(df_CN, df_BIN, on='index', how='left')
+df = df.sample(frac=0.1,  random_state=0)
+
+df.loc[:, 'fSn_V_CN'] =  df['Sn_V_CN'] / df['Sdn_CN']
+df.loc[:, 'fSn_S_CN'] =  df['Sn_S_CN'] / df['Sdn_CN']
+df.loc[:, 'fSn_CN'] =  df['Sn_CN'] / df['Sdn_CN']
+
+# df.loc[:, 'S_upward'] =  df['Sn_V_BIN'] / df['Sdn_BIN']
+# df.loc[:, 'S_upward'] =  df['Sn_S_BIN'] / df['Sdn_BIN']
+df.loc[:, 'S_up_CN'] =  df['Sdn_CN'] - df['Sn_CN']
+df.loc[:, 'S_up_BIN'] =  df['Sdn_BIN'] - df['Sn_BIN']
 
 # sns.scatterplot(data=df, x='LAI_BIN', y='LAI_CN')
 # plt.show()
@@ -77,15 +88,15 @@ def graph_comparison(ax, x, y, xlabel="C&N-R", ylabel="BINOMIAL",
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    # lims = [
-    #     np.min([y_model1.min(), y_model2.min()]),
-    #     np.max([y_model1.max(), y_model2.max()])
-    # ]
-
     lims = [
-        np.min([0, 0]),
+        np.min([y_model1.min(), y_model2.min()]),
         np.max([y_model1.max(), y_model2.max()])
     ]
+
+    # lims = [
+    #     np.min([0, 0]),
+    #     np.max([1000, 1000])
+    # ]
 
     # if ln:
     #
@@ -103,10 +114,12 @@ def graph_comparison(ax, x, y, xlabel="C&N-R", ylabel="BINOMIAL",
     ax.set_xlim(lims)
     ax.set_ylim(lims)
     ax.set_aspect("equal", adjustable="box")
+    ax.xaxis.set_minor_locator(tck.AutoMinorLocator())
+    ax.yaxis.set_minor_locator(tck.AutoMinorLocator())
 
     # Regression line
     m, b = np.polyfit(y_model1, y_model2, 1)
-    ax.plot(lims, m*np.array(lims) + b, color="red", lw=1, label="Fit")
+    # ax.plot(lims, m*np.array(lims) + b, color="red", lw=1, label="Fit")
     ax.legend(frameon=False, loc="lower right")
 
     # Stats box
@@ -135,18 +148,44 @@ def graph_comparison(ax, x, y, xlabel="C&N-R", ylabel="BINOMIAL",
 
 
 # ---- Example: 2 columns subplot ----
-fig, axes = plt.subplots(2, 3,
-                         figsize=(18, 11)
+sns.set_context("notebook")
+fig, axes = plt.subplots(3, 1,
+                         figsize=(6, 15)
                          )
 fig.subplots_adjust(wspace=0.05)
 
-graph_comparison(axes[0, 0], df['Sn_V_CN'], df['Sn_V_BIN'], xlabel="C&N-R", ylabel="BINOMIAL")
-graph_comparison(axes[0, 1], df['Sn_S_CN'], df['Sn_S_BIN'], xlabel="C&N-R", ylabel="BINOMIAL")
-graph_comparison(axes[0, 2], df['Sn_CN'], df['Sn_BIN'], xlabel="C&N-R", ylabel="BINOMIAL")
+graph_comparison(axes[0], df['Sn_V_CN'], df['Sn_V_BIN'], xlabel="S$_{n,C}$—C&N", ylabel="S$_{n,C}$—BIN")
+graph_comparison(axes[1], df['Sn_S_CN'], df['Sn_S_BIN'], xlabel="S$_{n,S}$—C&N", ylabel="S$_{n,S}$—BIN")
+graph_comparison(axes[2], df['Sn_CN'], df['Sn_BIN'], xlabel="S$_{n}$—C&N", ylabel="S$_{n}$—BIN")
+plt.tight_layout()
+# plt.savefig('files/comparison_SN_C&N_BINOMIAL.png', dpi=300)
+plt.show()
 
-graph_comparison(axes[1, 0], df['LE_V_CN'], df['LE_V_BIN'], xlabel="C&N-R", ylabel="BINOMIAL")
-graph_comparison(axes[1, 1], df['LE_S_CN'], df['LE_S_BIN'], xlabel="C&N-R", ylabel="BINOMIAL")
-graph_comparison(axes[1, 2], df['LE_CN'], df['LE_BIN'], xlabel="C&N-R", ylabel="BINOMIAL")
+# sns.set_context("notebook")
+fig, axes = plt.subplots(1, 1,
+                         figsize=(6, 15)
+                         )
+fig.subplots_adjust(wspace=0.05)
+
+plt.hist(df['S_up_BIN'], bins=100, density=True)
+plt.show()
+
+plt.hist(df['S_up_BIN']/df['Sdn_BIN'], bins=100, density=True)
+plt.show()
+
+albedo = df['S_up_BIN']/df['Sdn_BIN']
+
+graph_comparison(axes, df['S_up_CN'], df['S_up_BIN'], xlabel="Sr—C&N", ylabel="Sr—BIN")
+# graph_comparison(axes[1], df['fSn_S_CN'], df['fSn_S_BIN'], xlabel="S$_{n,S}$—C&N", ylabel="S$_{n,S}$—BIN")
+# graph_comparison(axes[2], df['fSn_CN'], df['fSn_BIN'], xlabel="S$_{n}$—C&N", ylabel="S$_{n}$—BIN")
+plt.tight_layout()
+# plt.savefig('files/comparison_SN_C&N_BINOMIAL.png', dpi=300)
+plt.show()
+
+# sns.scatterplot(x=df['Sdn_CN'], y=df['Sdn_BIN'], ax=axes[1, 0])
+# graph_comparison(axes[1, 0], df['Sdn_CN'], df['Sdn_BIN'], xlabel="C&N-R", ylabel="BINOMIAL")
+# graph_comparison(axes[1, 1], df['LE_S_CN'], df['LE_S_BIN'], xlabel="C&N-R", ylabel="BINOMIAL")
+# graph_comparison(axes[1, 2], df['LE_CN'], df['LE_BIN'], xlabel="C&N-R", ylabel="BINOMIAL")
 #
 # graph_comparison(axes[0, 0], df['Sn_V_CN'], df['Sn_V_BIN'], xlabel="C&N-R", ylabel="BINOMIAL")
 # graph_comparison(axes[0, 1], df['f_theta_CN'], df['f_theta_BIN'], xlabel="C&N-R", ylabel="BINOMIAL")
@@ -168,5 +207,3 @@ graph_comparison(axes[1, 2], df['LE_CN'], df['LE_BIN'], xlabel="C&N-R", ylabel="
 # axes[1].set_title("Canopy Net Radiation")
 # axes[2].set_title("Canopy Latent Heat Flux")
 
-# plt.savefig('files/comparison_TSEB_C&N_BINOMIAL.png', dpi=300)
-plt.show()

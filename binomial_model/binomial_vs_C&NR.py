@@ -145,7 +145,7 @@ problem = {
     ],
 }
 
-N = 500
+N = 1
 N_sim = N * (2 * problem['num_vars'] + 2)
 print(f"N_sim: {N_sim}")
 second_order = False

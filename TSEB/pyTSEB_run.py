@@ -80,6 +80,12 @@ Omega_H = TSEB.CI.calc_omega_Kustas(
     w_C=input_dict['w_V'] / input_dict['h_V']
 )
 
+Omega_VZA_H = TSEB.CI.calc_omega_Kustas(
+    Omega0,
+    0,
+    w_C=input_dict['w_V'] / input_dict['h_V']
+)
+
 Omega_R = TSEB.CI.calc_omega_rows(
     input_dict['LAI'],
     input_dict['fv'],
@@ -150,7 +156,7 @@ input_dict['LW_IN'] = Ln_in
 [flag_PT_all, f_theta, T_soil, T_veg, T_AC, Ln_soil, Ln_veg, LE_veg, H_veg,
  LE_soil, H_soil, G_mod, R_S, R_X, R_A, u_friction, L, n_iterations] = TSEB.TSEB_PT(
     Tr_K=input_dict['Trad'],
-    vza=input_dict['sza_degrees'],
+    vza=0,
     T_A_K=input_dict['Tair'],
     u=input_dict['u'],
     ea=input_dict['ea'],
@@ -186,7 +192,8 @@ print('Done!')
 #      LE_soil, H_soil, G_mod
 
 output_df = pd.DataFrame(input_dict)
-output_df.loc[:, 'omega_pyTSEB'] = Omega
+output_df.loc[:, 'omega_VZA_pyTSEB'] = Omega_VZA_H
+output_df.loc[:, 'omega_SZA_pyTSEB'] = Omega
 output_df.loc[:, 'f_theta_pyTSEB'] = f_theta
 output_df.loc[:, 'SN_V_pyTSEB'] = sn_veg
 output_df.loc[:, 'SN_S_pyTSEB'] = sn_soil

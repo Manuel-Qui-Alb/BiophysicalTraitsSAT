@@ -9,16 +9,17 @@ df_pyTSEB = pd.read_csv(rf'files/pyTSEB_outputs.csv').drop('Unnamed: 0', axis=1)
 # print(df_myTSEB.columns)
 # print(df_pyTSEB.columns)
 # nan_values = np.isnan(df_pyTSEB['LE_V_pyTSEB'])
-df_myTSEB = df_myTSEB[['omega_CN', 'f_theta_CN', 'Trad_V_CN', 'Trad_S_CN', 'Ln_V_CN', 'Sn_V_CN', 'Rn_V_CN', 'LE_V_CN']]
-df_pyTSEB = df_pyTSEB[['omega_pyTSEB', 'f_theta_pyTSEB', 'Trad_V_pyTSEB', 'Trad_S_pyTSEB', 'Ln_V_pyTSEB','SN_V_pyTSEB',
-                       'Rn_V_pyTSEB', 'LE_V_pyTSEB']]
+df_myTSEB = df_myTSEB[['omega_VZA_CN', 'omega_SZA_CN', 'f_theta_CN', 'Trad_V_CN', 'Trad_S_CN', 'Ln_V_CN', 'Sn_V_CN',
+                       'Rn_V_CN', 'LE_V_CN']]
+df_pyTSEB = df_pyTSEB[['omega_VZA_pyTSEB', 'omega_SZA_pyTSEB', 'f_theta_pyTSEB', 'Trad_V_pyTSEB', 'Trad_S_pyTSEB',
+                       'Ln_V_pyTSEB','SN_V_pyTSEB', 'Rn_V_pyTSEB', 'LE_V_pyTSEB']]
 #
 
 
 # nan_values = np.isnan(df_pyTSEB['LE_V_pyTSEB'])
 # print(np.any(nan_values))
-x = df_pyTSEB['omega_pyTSEB']
-y = df_myTSEB['omega_CN']
+x = df_pyTSEB['omega_VZA_pyTSEB']
+y = df_myTSEB['omega_VZA_CN']
 
 # xy = np.vstack([x,y])
 # z = gaussian_kde(xy)(xy)
@@ -28,8 +29,25 @@ plt.scatter(x, y,
 plt.plot([0, 1], [0, 1], c='grey')
 # plt.set_ylim([0, 1])
 # plt.set_xlim([0, 1])
-plt.ylabel(r'omega_pyTSEB')
-plt.ylabel(r'omega_myTSEB')
+plt.xlabel(r'omega_VZA_pyTSEB')
+plt.ylabel(r'omega_VZA_CN')
+
+# plt.savefig('files/f_theta_myTSEB_pyTSEB.png', dpi=300)
+plt.show()
+
+x = df_pyTSEB['omega_SZA_pyTSEB']
+y = df_myTSEB['omega_SZA_CN']
+
+# xy = np.vstack([x,y])
+# z = gaussian_kde(xy)(xy)
+plt.scatter(x, y,
+           # c=z,
+           s=10)
+plt.plot([0, 1], [0, 1], c='grey')
+# plt.set_ylim([0, 1])
+# plt.set_xlim([0, 1])
+plt.xlabel(r'omega_SZA_pyTSEB')
+plt.ylabel(r'omega_SZA_CN')
 
 # plt.savefig('files/f_theta_myTSEB_pyTSEB.png', dpi=300)
 plt.show()
@@ -43,7 +61,7 @@ z = gaussian_kde(xy)(xy)
 plt.scatter(x, y,
            c=z,
            s=10)
-# plt.plot([0, 1000], [0, 1000], c='grey')
+plt.plot([0, 1], [0, 1], c='grey')
 # plt.ylim([0, 1000])
 # plt.xlim([0, 1000])
 plt.xlabel(r'$f(\theta)$ pyTSEB')
@@ -77,14 +95,32 @@ z = gaussian_kde(xy)(xy)
 plt.scatter(x, y,
            c=z,
            s=10)
-plt.plot([-600, 300], [-600, 300], c='grey')
-plt.ylim([-600, 300])
-plt.xlim([-600, 300])
+# plt.plot([-600, 300], [-600, 300], c='grey')
+# plt.ylim([-400, 300])
+# plt.xlim([-400, 300])
 plt.xlabel(r'Ln_V_pyTSEB')
 plt.ylabel(r'Ln_V_myTSEB')
 plt.savefig('files/Ln_V_myTSEB_pyTSEB.png', dpi=300)
 plt.show()
 
+
+# x = df_pyTSEB['Rn_V_pyTSEB']
+# y = df_myTSEB['Rn_V_CN']
+# # Calculate the point density
+# xy = np.vstack([x,y])
+# z = gaussian_kde(xy)(xy)
+#
+# plt.scatter(x, y,
+#            c=z,
+#            s=10)
+# # plt.plot([0, 1000], [0, 1000], c='grey')
+# # plt.ylim([0, 1000])
+# # plt.xlim([0, 1000])
+# plt.xscale('log')
+# plt.xlabel(r'Rn_V_pyTSEB')
+# plt.ylabel(r'Rn_V_myTSEB')
+# plt.savefig('files/Rn_V_myTSEB_pyTSEB.png', dpi=300)
+# plt.show()
 
 x = df_pyTSEB['Rn_V_pyTSEB']
 y = df_myTSEB['Rn_V_CN']
@@ -98,24 +134,6 @@ plt.scatter(x, y,
 # plt.plot([0, 1000], [0, 1000], c='grey')
 # plt.ylim([0, 1000])
 # plt.xlim([0, 1000])
-plt.xscale('log')
-plt.xlabel(r'Rn_V_pyTSEB')
-plt.ylabel(r'Rn_V_myTSEB')
-plt.savefig('files/Rn_V_myTSEB_pyTSEB.png', dpi=300)
-plt.show()
-
-x = df_pyTSEB['Rn_V_pyTSEB']
-y = df_myTSEB['Rn_V_CN']
-# Calculate the point density
-xy = np.vstack([x,y])
-z = gaussian_kde(xy)(xy)
-
-plt.scatter(x, y,
-           c=z,
-           s=10)
-plt.plot([0, 1000], [0, 1000], c='grey')
-plt.ylim([0, 1000])
-plt.xlim([0, 1000])
 plt.xlabel(r'Rn_V_pyTSEB')
 plt.ylabel(r'Rn_V_myTSEB')
 plt.savefig('files/Rn_V_myTSEB_pyTSEB2.png', dpi=300)
@@ -129,29 +147,29 @@ z = gaussian_kde(xy)(xy)
 
 x = df_pyTSEB['Trad_V_pyTSEB']
 y = df_myTSEB['Trad_V_CN']
-# Calculate the point density
+# # Calculate the point density
 xy = np.vstack([x[~np.isnan(x)],y[~np.isnan(x)]])
 z = gaussian_kde(xy)(xy)
+
+# plt.scatter(x[~np.isnan(x)], y[~np.isnan(x)],
+#            c=z,
+#            s=10)
+# # plt.plot([280, 320], [280, 320], c='grey')
+# plt.xscale('log')
+# # plt.ylim([280, 320])
+# # plt.xlim([280, 320])
+# plt.xlabel(r'Trad_V_pyTSEB')
+# plt.ylabel(r'Trad_V_myTSEB')
+# plt.savefig('files/Trad_V_myTSEB_pyTSEB.png', dpi=300)
+# plt.show()
 
 plt.scatter(x[~np.isnan(x)], y[~np.isnan(x)],
            c=z,
            s=10)
 # plt.plot([280, 320], [280, 320], c='grey')
-plt.xscale('log')
+# plt.xscale('log')
 # plt.ylim([280, 320])
 # plt.xlim([280, 320])
-plt.xlabel(r'Trad_V_pyTSEB')
-plt.ylabel(r'Trad_V_myTSEB')
-plt.savefig('files/Trad_V_myTSEB_pyTSEB.png', dpi=300)
-plt.show()
-
-plt.scatter(x[~np.isnan(x)], y[~np.isnan(x)],
-           c=z,
-           s=10)
-plt.plot([280, 320], [280, 320], c='grey')
-# plt.xscale('log')
-plt.ylim([280, 320])
-plt.xlim([280, 320])
 plt.xlabel(r'Trad_V_pyTSEB')
 plt.ylabel(r'Trad_V_CN')
 plt.savefig('files/Trad_V_myTSEB_pyTSEB2.png', dpi=300)
@@ -160,7 +178,7 @@ plt.show()
 
 
 x = df_pyTSEB['LE_V_pyTSEB']
-y = df_myTSEB['LE_V_myTSEB']
+y = df_myTSEB['LE_V_CN']
 # Calculate the point density
 xy = np.vstack([x[~np.isnan(x)],y[~np.isnan(x)]])
 z = gaussian_kde(xy)(xy)
@@ -168,9 +186,9 @@ z = gaussian_kde(xy)(xy)
 plt.scatter(x[~np.isnan(x)], y[~np.isnan(x)],
            c=z,
            s=10)
-plt.plot([0, 1000], [0, 1000], c='grey')
-plt.ylim([0, 1000])
-plt.xlim([0, 1000])
+# plt.plot([0, 1000], [0, 1000], c='grey')
+# plt.ylim([0, 1000])
+# plt.xlim([0, 1000])
 plt.xlabel(r'LE_V_pyTSEB')
 plt.ylabel(r'LE_V_CN')
 plt.savefig('files/LE_V_myTSEB_pyTSEB.png', dpi=300)

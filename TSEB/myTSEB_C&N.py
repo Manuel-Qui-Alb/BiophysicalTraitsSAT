@@ -8,7 +8,7 @@ from pyTSEB import MO_similarity as MO
 import pyTSEB.TSEB as TSEB
 from SALib.sample import saltelli
 from SALib.analyze import sobol
-from binomial_model.BinomialModelPrism_DirectandDiffuseRadiation import compute_binomial_prism_manuel
+# from binomial_model.BinomialModelPrism_DirectandDiffuseRadiation import compute_binomial_prism_manuel
 from pyTSEB import net_radiation as rad
 import time
 
@@ -20,7 +20,7 @@ G_ratio = 0.1
 const_L = None
 
 save_inputs = True
-T_MODEL = 'CN_R'
+# T_MODEL = 'CN_H'
 
 FLAG_OK                = 0
 FLAG_NO_CONVERGENCE     = 1 << 0   # 1
@@ -40,19 +40,18 @@ FLAG_AELES_NEGATIVE  = 1 << 8
 # myTSEB(LAI, fv, x_LAD, sza_rad)
 docker_inputs = []
 
-def myTSEB_CN(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
+def myTSEB_CN(LAI, k_fc , h_V, row_sep, x_LAD, phi_degrees,
               leaf_width, Trad_var, Tair, u, plant_sep_var,
               P_atm, ea, sza_degrees, G_ratio,
-              emis_leaf, emis_soil, rho_vis_leaf, tau_vis_leaf,
-              rho_nir_leaf, tau_nir_leaf, rho_vis_soil, rho_nir_soil,
+              emis_leaf, emis_soil, abs_vis_leaf, abs_nir_leaf,
+              rho_vis_soil, rho_nir_soil,
               T_MODEL='CN_R', alpha_PT=1.26):
 
+    global omega_VZA
     Trad = Tair + Trad_var
     z_u = h_V + 2
-    z_T = h_V + 2
+    z_T = z_u
 
-    abs_vis_leaf = 1 - rho_vis_leaf - tau_vis_leaf
-    abs_nir_leaf = 1 - rho_nir_leaf - tau_nir_leaf
 
     sza_rad =  np.radians(sza_degrees)
     phi_rad = np.radians(phi_degrees)
@@ -69,15 +68,6 @@ def myTSEB_CN(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
     # f_diff = np.clip(0.15 + 0.6 * (1 - mu), 0.15, 0.7)
     Sdn = Sb + Sd
 
-    # Fv based on LAI. fv and LAI are inherently related.
-    # It was considered that the FV can vary between 30 and 1.1 with respect to models based on LAI.
-    K_be = myTSEB.estimate_Kbe(x_LAD, 0)
-    fv02 = np.clip((1 - np.exp(-K_be * LAI)) * fv_var, 1e-6, 1)
-    w_V = fv02 * row_sep
-    # plant_sep = row_sep * plant_sep_var  # sp [0.5, 1]
-
-    F = np.asarray(LAI / fv02, dtype=np.float32)
-
     c_p = met.calc_c_p(P_atm, ea)
 
     alpha_PT = np.full_like(LAI,  alpha_PT)
@@ -87,48 +77,70 @@ def myTSEB_CN(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
     #  z0_soil) = myTSEB.get_emiss_rho_tau(LAI)
     z0_soil = np.full(LAI.shape, 0.01)
 
+    # Fv based on LAI. fv and LAI are inherently related.
+    # It was considered that the FV can vary between 6 and 1 with respect to models based on LAI.
+    K_be = myTSEB.estimate_Kbe(x_LAD, 0)
+    f_theta = (1 - np.exp(-K_be * k_fc  * LAI))
+    f_theta = np.clip(f_theta, 1e-6, 0.999999)
+    # f_theta = fv_var
+    w_V = f_theta * row_sep
+    F = np.asarray(LAI / f_theta, dtype=np.float32)
+
     Omega0 = TSEB.CI.calc_omega0_Kustas(
         LAI,
-        fv02,
+        f_theta,
         x_LAD=x_LAD,
         isLAIeff=False
     )
 
     if T_MODEL == 'CN_H':
-        # omega = myTSEB.off_nadir_clumpling_index_Kustas_Norman(
-        #     LAI,
-        #     fv02,
-        #     h_V,
-        #     w_V,
-        #     x_LAD,
-        #     sza_rad
-        # )
-
-        omega = TSEB.CI.calc_omega_Kustas(
+        omega_SZA = TSEB.CI.calc_omega_Kustas(
             Omega0,
-            sza_degrees,
+            theta=sza_degrees,
             w_C= w_V / h_V
         )
-    elif T_MODEL == 'CN_R':
-        omega = TSEB.CI.calc_omega_rows(
-            LAI,
-            fv02,
-            theta=sza_degrees,
-            psi=phi_degrees,
-            w_c=w_V / h_V,
-            x_lad=x_LAD,
-            is_lai_eff=False
+
+        omega_VZA = TSEB.CI.calc_omega_Kustas(
+            Omega0,
+            theta=0,
+            w_C=w_V / h_V
         )
+
+    elif T_MODEL == 'CN_R':
+        omega_SZA = myTSEB.rectangular_row_clumping_index_parry(
+            LAI=LAI,
+            fv0=f_theta,
+            w_V=w_V,
+            h_V=h_V,
+            zenith_angle=sza_rad,
+            phi=phi_rad,
+            hb_V=0,
+            L=row_sep,
+            x_LAD=1
+        )
+
+        omega_VZA = myTSEB.rectangular_row_clumping_index_parry(
+            LAI=LAI,
+            fv0=f_theta,
+            w_V=w_V,
+            h_V=h_V,
+            zenith_angle=0,
+            phi=phi_rad,
+            hb_V=0.5,
+            L=row_sep,
+            x_LAD=1
+        )
+
         # omega = np.full_like(LAI, 1)
     else:
-        omega = np.full_like(LAI, 1)
+        omega_SZA = np.full_like(LAI, 1)
 
-    f_theta = myTSEB.estimate_f_theta(
-        LAI=LAI,
-        x_LAD=x_LAD,
-        omega=omega,
-        sza=sza_rad
-    )
+    # f_theta = myTSEB.estimate_f_theta(
+    #     LAI=LAI,
+    #     x_LAD=x_LAD,
+    #     omega=omega_VZA,
+    #     theta=0
+    # )
 
     ########################################################################################################################
     # R_x = boundary layer resistance of the complete canopy of leaves
@@ -140,7 +152,7 @@ def myTSEB_CN(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
         h_V,
         w_V,
         np.full_like(LAI, TSEB.res.CROP),
-        f_c=fv02
+        f_c=f_theta
     )
     d_0[d_0 < 0] = 0
     z_0m[z_0m < np.min(z0_soil)] = np.mean(z0_soil)
@@ -199,34 +211,20 @@ def myTSEB_CN(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
     Sdn_dir = (1. - skyl) * Sdn
     Sdn_dif = skyl * Sdn
 
-    Sn_V, Sn_S, Rn_V0, Rn_S0 = myTSEB.estimate_Rn(
+    Sn_V, Sn_S = myTSEB.shortwave_transmittance_model_CN(
         Sdn_dir=Sdn_dir,
         Sdn_dif=Sdn_dif,
         fvis=fvis,
         fnir=fnir,
         sza=sza_degrees,
         LAI=LAI,
-        Trad_S=Trad_S,
-        Trad_V=Trad_V,
-        Tair=Tair,
-        ea=ea,
-        P_atm=P_atm,
-        omega=omega,
+        omega=omega_SZA,
         x_LAD=x_LAD,
-        rho_vis_leaf=rho_vis_leaf,
-        rho_nir_leaf=rho_nir_leaf,
-        tau_vis_leaf=tau_vis_leaf,
-        tau_nir_leaf=tau_nir_leaf,
+        abs_vis_leaf=abs_vis_leaf,
+        abs_nir_leaf=abs_nir_leaf,
         rho_vis_soil=rho_vis_soil,
-        rho_nir_soil=rho_nir_soil,
-        emis_leaf=emis_leaf,
-        emis_soil=emis_soil)
+        rho_nir_soil=rho_nir_soil)
 
-    # Rn_V0 = np.array(np.clip(Rn_V0, -150, 1000))
-    # Rn_S0 = np.array(np.clip(Rn_S0, -150, 1000))
-
-    # Rn_V0_copy = Rn_V0.copy()
-    # Rn_S0_copy = Rn_S0.copy()
     L_dn = rad.calc_longwave_irradiance(
         ea,
         Tair,
@@ -303,7 +301,7 @@ def myTSEB_CN(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
                     "u": u[loop_con],
                     "rho": rho[loop_con],
                     "c_p": c_p[loop_con],
-                    "f_cover": fv02[loop_con],
+                    "f_cover": f_theta[loop_con],
                     "w_C": w_V[loop_con] / h_V[loop_con],
                     "massman_profile": massman_profile,
                     "res_params": {k: res_params[k] for k in res_params.keys()},
@@ -347,7 +345,6 @@ def myTSEB_CN(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
             rho=rho[loop_con],
             c_p=c_p[loop_con]
         )
-        # print(Trad_V)
 
         Trad_S[loop_con] = myTSEB.estimate_Trad_S(
             Trad=Trad[loop_con],
@@ -394,7 +391,7 @@ def myTSEB_CN(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
                     "u": u[loop_con],
                     "rho": rho[loop_con],
                     "c_p": c_p[loop_con],
-                    "f_cover": fv02[loop_con],
+                    "f_cover": f_theta[loop_con],
                     "w_C": w_V[loop_con] / h_V[loop_con],
                     "massman_profile": massman_profile,
                     "res_params": {k: res_params[k] for k in res_params.keys()},
@@ -471,22 +468,21 @@ def myTSEB_CN(LAI, fv_var, h_V, row_sep, x_LAD, phi_degrees,
     flag_LETOTAL_NEGATIVE_test = LE < 0
     flag[flag_LETOTAL_NEGATIVE_test] = FLAG_LETOTAL_NEGATIVE
 
-    return omega, f_theta, Sn_V, Sn_S, Trad_V, Trad_S, Ln_V, Ln_S, Rn_V, Rn_S, LE_V, LE_S, flag
+    return Sdn, f_theta, Sn_V, Sn_S, Trad_V, Trad_S, Ln_V, Ln_S, Rn_V, Rn_S, LE_V, LE_S, flag
 #
 
 names = [
-        "LAI", "fv_var", "h_V", "row_sep", "x_LAD", 'phi_degrees',
-        "leaf_width", "Trad_var", "Tair", "u", "plant_sep_var",
+        "LAI", "k_fc", "h_V", "row_sep", "x_LAD", 'phi_degrees',
+        "leaf_width", "Trad_var", "Tair", "u", 'plant_sep_var',
         "P_atm", "ea", "sza_degrees", 'G_ratio',
-        'emis_leaf', 'emis_soil', 'rho_vis_leaf', 'tau_vis_leaf',
-        'rho_nir_leaf', 'tau_nir_leaf', 'rho_vis_soil', 'rho_nir_soil']
+        'emis_leaf', 'emis_soil', 'abs_vis_leaf', 'abs_nir_leaf', 'rho_vis_soil', 'rho_nir_soil']
 
 problem = {
-    "num_vars": 23,
+    "num_vars": 21,
     "names": names,
     "bounds": [
         [0.2, 5],  # 1. LAI
-        [0.7, 1.1], # 2. fv_var respect to LAI: f(LAI) * fv_var [0.01, 1]
+        [0.25, 1], # 2. k_fc respect to LAI: f(LAI) * fv_var [0.5, 1]
         [1, 5],  # 3. h_V (m)
         [2, 8],  # 4. row_sep (m)
         [0.5, 1.5],  # 5. x_LAD
@@ -502,27 +498,28 @@ problem = {
         [0.34, 0.36], # 15. G_ratio
         [0.96, 0.99],  # 16. emis_leaf
         [0.90, 0.98],  # 17. emis_soil
-        [0.03, 0.18],  # 18. rho_vis_leaf
-        [0.02, 0.10],  # 19. tau_vis_leaf
-        [0.32, 0.55],  # 20. rho_nir_leaf (tightened)
-        [0.25, 0.45],  # 21. tau_nir_leaf (tightened)
-        [0.05, 0.30],  # 22. rho_vis_soil
-        [0.20, 0.45],  # 23. rho_nir_soil
+        [0.80, 0.90],  # 18. abs_vis_leaf
+        [0.05, 0.15],  # 19. abs_nir_leaf
+        # [0.03, 0.18],  # 18. rho_vis_leaf
+        # [0.02, 0.10],  # 19. tau_vis_leaf
+        # [0.32, 0.55],  # 20. rho_nir_leaf (tightened)
+        # [0.25, 0.45],  # 21. tau_nir_leaf (tightened)
+        [0.05, 0.30],  # 20. rho_vis_soil
+        [0.20, 0.45],  # 21. rho_nir_soil
 ]
 }
 
-
-N = 1000
+N = 5000
 second_order = False
 X = saltelli.sample(problem, N, calc_second_order=second_order)
 
 inputs_dict = {f"{names[i]}": X[:, i:i+1] for i in range(X.shape[1])}
 
 start_time = time.perf_counter()
-omega, f_theta, Sn_V, Sn_S, Trad_V, Trad_S, Ln_V, Ln_S, Rn_V, Rn_S, LE_V, LE_S, flag = (
+Sdn, f_theta, Sn_V, Sn_S, Trad_V, Trad_S, Ln_V, Ln_S, Rn_V, Rn_S, LE_V, LE_S, flag = (
     myTSEB_CN(
         LAI=inputs_dict['LAI'],
-        fv_var=inputs_dict['fv_var'],
+        k_fc=inputs_dict['k_fc'],
         h_V=inputs_dict['h_V'],
         row_sep=inputs_dict['row_sep'],
         x_LAD=inputs_dict['x_LAD'],
@@ -538,10 +535,8 @@ omega, f_theta, Sn_V, Sn_S, Trad_V, Trad_S, Ln_V, Ln_S, Rn_V, Rn_S, LE_V, LE_S, 
         G_ratio=inputs_dict['G_ratio'],
         emis_leaf=inputs_dict['emis_leaf'],
         emis_soil=inputs_dict['emis_soil'],
-        rho_vis_leaf=inputs_dict['rho_vis_leaf'],
-        tau_vis_leaf=inputs_dict['tau_vis_leaf'],
-        rho_nir_leaf=inputs_dict['rho_nir_leaf'],
-        tau_nir_leaf=inputs_dict['tau_nir_leaf'],
+        abs_vis_leaf=inputs_dict['abs_vis_leaf'],
+        abs_nir_leaf=inputs_dict['abs_nir_leaf'],
         rho_vis_soil=inputs_dict['rho_vis_soil'],
         rho_nir_soil=inputs_dict['rho_nir_soil'],
         T_MODEL='CN_R',
@@ -550,12 +545,12 @@ omega, f_theta, Sn_V, Sn_S, Trad_V, Trad_S, Ln_V, Ln_S, Rn_V, Rn_S, LE_V, LE_S, 
 )
 end_time = time.perf_counter()
 elapsed_time = end_time - start_time
-print(f"Execution time TSEB B&N: {elapsed_time} seconds")
+print(f"Execution time TSEB C&N: {elapsed_time} seconds")
 
 df_inputs = pd.DataFrame(X)
 df_inputs.columns = names
 
-df_inputs.loc[:, 'omega_CN'] = omega
+df_inputs.loc[:, 'Sdn_CN'] = Sdn
 df_inputs.loc[:, 'f_theta_CN'] = f_theta
 df_inputs.loc[:, 'Sn_V_CN'] = Sn_V
 df_inputs.loc[:, 'Sn_S_CN'] = Sn_S

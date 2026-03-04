@@ -120,7 +120,7 @@ def off_nadir_clumpling_index_Kustas_Norman(LAI, fv, h_V, w_V, x_LAD, sza):
     return omega
 
 
-def rectangular_row_clumping_index_parry(LAI, fv0, w_V, h_V, sza, phi, hb_V=0, L=None, x_LAD=1 ):
+def rectangular_row_clumping_index_parry(LAI, fv0, w_V, h_V, zenith_angle, phi, hb_V=0, L=None, x_LAD=1 ):
     """
     Estimate the off nadir clumpling index from Campbell and Norman (1998) and Parry (2019).
 
@@ -156,10 +156,14 @@ def rectangular_row_clumping_index_parry(LAI, fv0, w_V, h_V, sza, phi, hb_V=0, L
 
     # phi_radians = np.arccos(np.cos(saa_radians - row_azimuth_radians))
 
-    K_be = estimate_Kbe(x_LAD, sza)
+    K_be = estimate_Kbe(x_LAD, zenith_angle)
 
     # Solar canopy view factor f_sc(theta, phi) Eq. 15
-    alpha = np.tan(sza) * np.abs(np.sin(phi))
+    alpha = np.tan(zenith_angle) * np.abs(np.sin(phi))
+
+    # F = Lead area index of a real canopy. Leaf area contained in a prism divided by its prism width and length
+    F = LAI / fv0
+    # F2 = LAI * L / w_V
 
     try:
         f_sc = (w_V + (h_V - hb_V) * alpha) / L
@@ -169,43 +173,12 @@ def rectangular_row_clumping_index_parry(LAI, fv0, w_V, h_V, sza, phi, hb_V=0, L
     f_sc = np.clip(f_sc, 0.0, 1.0)
 
     # The gep fraction of the real-world canopy Eq 13.
-    gap_phi = f_sc * np.exp(-K_be * LAI) + (1 - f_sc)
+    gap_phi = f_sc * np.exp(-K_be * F) + (1 - f_sc)
     gap_phi = np.clip(gap_phi, 0, 1.0)
 
-    omega_row = -np.log(gap_phi) / (K_be * LAI)
+    omega_row = -np.log(gap_phi) / (K_be * F)
     omega_row = np.clip(omega_row, 0.05, 2)
     return omega_row
-
-
-def estimate_f_theta(LAI, x_LAD, omega, sza, vza=0):
-    """
-    Estimate the clumpling index from Campbell and Norman (1998) and Parry (2019).
-
-    Parameters
-    ----------
-    LAI : float
-        Leaf Area Index
-    x_LAD : float
-        Ellipsoidal leaf angle distribution parameter (dimensionless).
-        x = 1 for spherical LAD, x < 1 for more vertical leaves,
-        and x > 1 for more horizontal leaves.
-    omega : float
-        Clumping Index.
-    vza : float
-        view zenith angle in radians.
-    Returns
-    -------
-    float
-        fraction of incident beam radiation intercepted by the plant at view zenith angle (θ)
-    """
-
-    ### Calculating intercepted radiation by the canopy
-    K_be = estimate_Kbe(x_LAD, sza)
-
-    # omega0 = calculate_omega0(LAI, fv, x_LAD, theta_s)
-    f_theta = 1 - np.exp( (-K_be * omega * LAI) / np.cos(vza))
-    f_theta = np.clip(f_theta, 0.01, 1)
-    return f_theta
 
 
 def estimate_Trad_S(Trad, Trad_V, f_theta):
@@ -244,6 +217,40 @@ def estimate_Trad_S(Trad, Trad_V, f_theta):
 
     Trad_S = (Trad_diff / (1 - f_theta)) ** (1 / 4)
     return Trad_S
+
+
+def estimate_f_theta(LAI, x_LAD, omega, theta):
+    """
+    Estimate the clumpling index from Campbell and Norman (1998) and Parry (2019).
+
+    Parameters
+    ----------
+    LAI : float
+        Leaf Area Index
+    x_LAD : float
+        Ellipsoidal leaf angle distribution parameter (dimensionless).
+        x = 1 for spherical LAD, x < 1 for more vertical leaves,
+        and x > 1 for more horizontal leaves.
+    omega : float
+        Clumping Index.
+    theta : float
+        Zenith angle in radians.
+        If theta = SZA, f_theta is fraction of intercepted beam radiation.
+        If theta = VZA, f_theta is fractiona vegetation cover
+
+    Returns
+    -------
+    float
+        fraction of incident beam radiation intercepted by the plant at view zenith angle (θ)
+    """
+
+    ### Calculating intercepted radiation by the canopy
+    K_be = estimate_Kbe(x_LAD, theta)
+
+    # omega0 = calculate_omega0(LAI, fv, x_LAD, theta_s)
+    f_theta = 1 - np.exp( (-K_be * omega * LAI) )
+    f_theta = np.clip(f_theta, 0.01, 1)
+    return f_theta
 
 
 def estimate_Rn(Sdn_dir, Sdn_dif, fvis, fnir, sza, LAI, Trad_S, Trad_V,
@@ -320,9 +327,170 @@ def estimate_Rn(Sdn_dir, Sdn_dif, fvis, fnir, sza, LAI, Trad_S, Trad_V,
     return  Sn_V, Sn_S, Rn_V, Rn_S
 
 
+def calc_K_be_Campbell(theta, x_lad=1, radians=False):
+    ''' Beam extinction coefficient
+
+    Calculates the beam extinction coefficient based on [Campbell1998]_ ellipsoidal
+    leaf inclination distribution function.
+
+    Parameters
+    ----------
+    theta : float
+        incidence zenith angle.
+    x_lad : float, optional
+        Chi parameter for the ellipsoidal Leaf Angle Distribution function,
+        use x_lad=1 for a spherical LAD.
+    radians : bool, optional
+        Should be True if theta is in radians.
+        Default is False.
+
+    Returns
+    -------
+    K_be : float
+        beam extinction coefficient.
+    x_lad: float, optional
+        x parameter for the ellipsoidal Leaf Angle Distribution function,
+        use x_lad=1 for a spherical LAD.
+
+    References
+    ----------
+    .. [Campbell1998] Campbell, G. S. & Norman, J. M. (1998), An introduction to environmental
+        biophysics. Springer, New York
+        https://archive.org/details/AnIntroductionToEnvironmentalBiophysics.
+    '''
+
+    if not radians:
+        theta = np.radians(theta)
+
+    K_be = (np.sqrt(x_lad**2 + np.tan(theta)**2)
+            / (x_lad + 1.774 * (x_lad + 1.182)**-0.733))
+
+    return K_be
+
+SB = 5.670373e-8
+TAUD_STEP_SIZE_DEG = 5
+
+def _calc_taud(x_lad, lai):
+
+    taud = 0
+    for angle in range(0, 90, TAUD_STEP_SIZE_DEG):
+        angle = np.radians(angle)
+        akd = calc_K_be_Campbell(angle, x_lad, radians=True)
+        taub = np.exp(-akd * lai)
+        taud += taub * np.cos(angle) * np.sin(angle) * np.radians(TAUD_STEP_SIZE_DEG)
+
+    return 2.0 * taud
+
+
+def calc_spectra_Cambpell(lai, sza, abs_leaf, rho_soil, x_lad=1, lai_eff=None):
+    """ Canopy spectra
+
+    Estimate canopy spectral using the [Campbell1998]_
+    Radiative Transfer Model
+
+    Parameters
+    ----------
+    lai : float
+        Effective Leaf (Plant) Area Index.
+    sza : float
+        Sun Zenith Angle (degrees).
+    rho_leaf : float, or array_like
+        Leaf bihemispherical reflectance
+    tau_leaf : float, or array_like
+        Leaf bihemispherical transmittance
+    rho_soil : float
+        Soil bihemispherical reflectance
+    x_lad : float,  optional
+        x parameter for the ellipsoildal Leaf Angle Distribution function of
+        Campbell 1988 [default=1, spherical LIDF].
+    lai_eff : float or None, optional
+        if set, its value is the directional effective LAI
+        to be used in the beam radiation, if set to None we assume homogeneous canopies.
+
+    Returns
+    -------
+    albb : float or array_like
+        Beam (black sky) canopy albedo
+    albd : float or array_like
+        Diffuse (white sky) canopy albedo
+    taubt : float or array_like
+        Beam (black sky) canopy transmittance
+    taudt : float or array_like
+        Beam (white sky) canopy transmittance
+
+    References
+    ----------
+    .. [Campbell1998] Campbell, G. S. & Norman, J. M. (1998), An introduction to environmental
+        biophysics. Springer, New York
+        https://archive.org/details/AnIntroductionToEnvironmentalBiophysics.
+    """
+
+    # calculate aborprtivity
+    amean = abs_leaf
+    amean_sqrt = np.sqrt(amean)
+    # del rho_leaf, tau_leaf, amean
+
+    # Calculate canopy beam extinction coefficient
+    # Modification to include other LADs
+    if lai_eff is None:
+        lai_eff = np.asarray(lai)
+    else:
+        lai_eff = np.asarray(lai_eff)
+
+    # D I F F U S E   C O M P O N E N T S
+    # Integrate to get the diffuse transmitance
+    taud = _calc_taud(x_lad, lai)
+
+    # Diffuse light canopy reflection coefficients  for a deep canopy
+    akd = -np.log(taud) / lai
+    rcpy= (1.0 - amean_sqrt) / (1.0 + amean_sqrt)  # Eq 15.7
+    rdcpy = 2.0 * akd * rcpy / (akd + 1.0)  # Eq 15.8
+
+    # Diffuse canopy transmission and albedo coeff for a generic canopy (visible)
+    expfac = amean_sqrt * akd * lai
+    del akd
+    neg_exp, d_neg_exp = np.exp(-expfac), np.exp(-2.0 * expfac)
+    xnum = (rdcpy * rdcpy - 1.0) * neg_exp
+    xden = (rdcpy * rho_soil - 1.0) + rdcpy * (rdcpy - rho_soil) * d_neg_exp
+    taudt = xnum / xden  # Eq 15.11
+    del xnum, xden
+    fact = ((rdcpy - rho_soil) / (rdcpy * rho_soil - 1.0)) * d_neg_exp
+    albd = (rdcpy + fact) / (1.0 + rdcpy * fact)  # Eq 15.9
+    del rdcpy, fact
+
+    # B E A M   C O M P O N E N T S
+    # Direct beam extinction coeff (spher. LAD)
+    akb = calc_K_be_Campbell(sza, x_lad)  # Eq. 15.4
+
+    # Direct beam canopy reflection coefficients for a deep canopy
+    rbcpy = 2.0 * akb * rcpy / (akb + 1.0)  # Eq 15.8
+    del rcpy, sza, x_lad
+    # Beam canopy transmission and albedo coeff for a generic canopy (visible)
+    expfac = amean_sqrt * akb * lai_eff
+    neg_exp, d_neg_exp = np.exp(-expfac), np.exp(-2.0 * expfac)
+    del amean_sqrt, akb, lai_eff
+    xnum = (rbcpy * rbcpy - 1.0) * neg_exp
+    xden = (rbcpy * rho_soil - 1.0) + rbcpy * (rbcpy - rho_soil) * d_neg_exp
+    taubt = xnum / xden  # Eq 15.11
+    del xnum, xden
+    fact = ((rbcpy - rho_soil) / (rbcpy * rho_soil - 1.0)) * d_neg_exp
+    del expfac
+    albb = (rbcpy + fact) / (1.0 + rbcpy * fact)  # Eq 15.9
+    del rbcpy, fact
+
+    taubt, taudt, albb, albd, rho_soil = map(np.array,
+                                             [taubt, taudt, albb, albd, rho_soil])
+
+    taubt[np.isnan(taubt)] = 1
+    taudt[np.isnan(taudt)] = 1
+    albb[np.isnan(albb)] = rho_soil[np.isnan(albb)]
+    albd[np.isnan(albd)] = rho_soil[np.isnan(albd)]
+
+    return albb, albd, taubt, taudt
+
 def shortwave_transmittance_model_CN(Sdn_dir, Sdn_dif,fvis, fnir, sza,
                                      LAI, omega=1, x_LAD=1,
-                                     rho_vis_leaf=0.07, rho_nir_leaf=0.32, tau_vis_leaf=0.08, tau_nir_leaf=0.33,
+                                     abs_vis_leaf=0.8, abs_nir_leaf=0.10,
                                      rho_vis_soil=0.15, rho_nir_soil=0.25):
     """
        Estimate net radiation (Rn)
@@ -363,13 +531,12 @@ def shortwave_transmittance_model_CN(Sdn_dir, Sdn_dif,fvis, fnir, sza,
     # Sdn_dir = (1. - skyl) * S_dn
     # Sdn_dif = skyl * S_dn
 
-    albb, albd, taubt, taudt = rad.calc_spectra_Cambpell(lai=LAI,
-                                                         sza=sza,
-                                                         rho_leaf=np.array((rho_vis_leaf, rho_nir_leaf)),
-                                                         tau_leaf=np.array((tau_vis_leaf, tau_nir_leaf)),
-                                                         rho_soil=np.array((rho_vis_soil, rho_nir_soil)),
-                                                         x_lad=x_LAD,
-                                                         lai_eff=LAI_eff)
+    albb, albd, taubt, taudt = calc_spectra_Cambpell(lai=LAI,
+                                                     sza=sza,
+                                                     abs_leaf=np.array((abs_vis_leaf, abs_nir_leaf)),
+                                                     rho_soil=np.array((rho_vis_soil, rho_nir_soil)),
+                                                     x_lad=x_LAD,
+                                                     lai_eff=LAI_eff)
 
     Sn_V = ((1.0 - taubt[0]) * (1.0 - albb[0]) * Sdn_dir * fvis
             + (1.0 - taubt[1]) * (1.0 - albb[1]) * Sdn_dir * fnir
