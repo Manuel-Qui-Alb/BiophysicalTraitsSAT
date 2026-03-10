@@ -8,14 +8,18 @@ import GeneralFunctions as GF
 from pyTSEB import resistances as res
 
 
-Trad_var = np.arange(0, 10, 1).astype(float)
+Trad_var = np.array([0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5])
+LAI_CC = np.full_like(Trad_var, 4)
 
-LAI_CC = np.full_like(Trad_var, 1)
-LAI_T = np.full_like(LAI_CC, 2)
+# LAI_CC = np.array([0.1, 0.5, 1, 1.5, 2, 2.5, 3])
+# Trad_var = np.full_like(LAI_CC, 2)
+
+# LAI_CC = np.full_like(Trad_var, 3)
+LAI_T = np.full_like(LAI_CC, 3)
 # LAI_T = np.random.uniform(2.9, 3, 1000)
 K_be = GF.estimate_Kbe(x_LAD=1, sza=0)
-fv_CC = (1 - np.exp(-K_be * LAI_CC))
-fv_T = (1 - np.exp(-K_be * LAI_T))
+fv_CC = (1 - np.exp(-K_be * 0.8 * LAI_CC))
+fv_T = (1 - np.exp(-K_be * 0.8 * LAI_T))
 h_T = np.full_like(LAI_T, 2)
 w_T = np.full_like(LAI_T, 1)
 
@@ -90,6 +94,27 @@ saa_degrees = solpos.azimuth.values
 irradiance_cs = site.get_clearsky(times)
 St = irradiance_cs.ghi.values
 
+########################################################################################################
+##################################### Add clumping index #####################################
+########################################################################################################
+omega0_T = TSEB.CI.calc_omega0_Kustas(
+    LAI_T,
+    fv_T,
+    x_LAD=x_LAD,
+    isLAIeff=False
+)
+
+omega_SZA_T = TSEB.CI.calc_omega_Kustas(
+    omega0_T,
+    theta=sza_degrees,
+    w_C=w_T / h_T
+)
+
+LAI_eff_T = LAI_T * omega_SZA_T
+# omega0_un = CI.calc_omega0_Kustas(LAI_ov, fv_ov, x_LAD=x_LAD, isLAIeff=True)
+omega0_CC = np.full_like(LAI_CC, 0.8)
+LAI_eff_CC = LAI_CC * omega0_CC
+
 difvis, difnir, fvis, fnir = TSEB.rad.calc_difuse_ratio(
     S_dn=St,
     sza=sza_degrees,
@@ -107,7 +132,7 @@ albb_ground, albd_ground, taubt_CC, taudt_CC = rad.calc_spectra_Cambpell(
     tau_leaf=np.array((tau_vis_leaf, tau_nir_leaf)),
     rho_soil=rho_soil,
     x_lad=x_LAD,
-    lai_eff=None)
+    lai_eff=LAI_eff_CC)
 
 
 _, _, taubt_T, taudt_T = rad.calc_spectra_Cambpell(LAI_T,
@@ -116,9 +141,9 @@ _, _, taubt_T, taudt_T = rad.calc_spectra_Cambpell(LAI_T,
                                                    np.array((tau_vis_leaf, tau_nir_leaf)),
                                                    albb_ground,
                                                    x_lad=x_LAD,
-                                                   lai_eff=None)
+                                                   lai_eff=LAI_eff_T)
 
-Lt_T = np.nan_to_num(LAI_T / fv_T)
+Lt_T = np.nan_to_num(LAI_eff_T / fv_T)
 # Lt_T = np.full_like(Lt_T, 5)
 albb_T, albd_T, _, _ = rad.calc_spectra_Cambpell(Lt_T,
                                                  sza_degrees,
@@ -126,16 +151,16 @@ albb_T, albd_T, _, _ = rad.calc_spectra_Cambpell(Lt_T,
                                                  np.array((tau_vis_leaf, tau_nir_leaf)),
                                                  albb_ground,
                                                  x_lad=x_LAD,
-                                                 lai_eff=None)
+                                                 lai_eff=Lt_T)
 
-Lt_CC = np.nan_to_num(LAI_CC / fv_CC)
+Lt_CC = np.nan_to_num(LAI_eff_CC / fv_CC)
 albb_CC, albd_CC, _, _ = rad.calc_spectra_Cambpell(Lt_CC,
                                                    sza_degrees,
                                                    np.array((rho_vis_leaf, rho_nir_leaf)),
                                                    np.array((tau_vis_leaf, tau_nir_leaf)),
                                                    rho_soil,
                                                    x_lad=x_LAD,
-                                                   lai_eff=None)
+                                                   lai_eff=Lt_CC)
 
 # plt.scatter(albb_CC[0], albb_T1[0])
 # plt.show()
@@ -214,7 +239,7 @@ z_0m_CC[z_0m_CC < np.min(z0_soil)] = np.mean(z0_soil)
 [flag_3seb, t_s_3seb, t_vine_3seb, t_cc_3seb, t_ac_3seb, ln_sub_3seb, ln_vine_3seb,
  ln_cc_3seb, ln_s_3seb, le_vine_3seb, h_vine_3seb, le_cc_3seb, h_cc_3seb,
  le_s_3seb, h_s_3seb, g_3seb, r_s_3seb, r_sub_3seb, r_x_3seb, r_a_3seb, u_friction_3seb,
- l_mo_3seb, n_iterations_3seb] = py3seb.ThreeSEB_PT(
+ l_mo_3seb, n_iterations_3seb, alpha_final, alpha_final_sub] = py3seb.ThreeSEB_PT(
     Tr_K=Trad,
     vza=0,
     T_A_K=Tair,
@@ -255,19 +280,25 @@ z_0m_CC[z_0m_CC < np.min(z0_soil)] = np.mean(z0_soil)
     massman_profile=[0.0, []],
     const_L=None)
 
-
-Rn_G = Sn_G + Sn_S + ln_sub_3seb
-Rn_T = Sn_T + ln_vine_3seb
 from matplotlib import pyplot as plt
-# plt.plot(LAI_CC, le_vine_3seb, c='green')
-# plt.plot(LAI_CC, Sn_T, c="brown", linestyle="dashed")
-# plt.plot(LAI_CC, ln_vine_3seb, c="brown", linestyle="dashed")
-plt.plot(Trad_var, le_vine_3seb, c="green", linestyle="dashed", marker="o")
-# plt.plot(LAI_CC, Rn_T, c="green", linestyle="dashed")
-# plt.plot(LAI_CC, le_vine_3seb, c="brown")
-# plt.plot(LAI_CC, le_cc_3seb + le_s_3seb, c="green")
-# plt.show()
-# plt.ylim([0, 400])
+
+plt.plot(Trad_var, t_s_3seb,  marker="o", label="le_s_3seb")
+plt.plot(Trad_var, t_cc_3seb, marker="o", label="le_cc_3seb")
+plt.plot(Trad_var, t_vine_3seb, marker="o", label="le_vine_3seb")
+plt.legend()
+plt.ylabel("py3SEB")
+plt.xlabel("Trad_var")
 plt.show()
-# print(le_vine_3seb)
-# print(le_cc_3seb)
+#
+# print("H_C_sub mean:", np.nanmean(h_cc_3seb))
+# print("H_S mean:", np.nanmean(h_s_3seb))
+# print("Rn_C_sub mean:", np.nanmean(ln_cc_3seb + Sn_CC))
+# print("Rn_S mean:", np.nanmean(ln_s_3seb + Sn_S))
+# print("G mean:", np.nanmean(g_3seb))
+# print("T_C_sub mean:", np.nanmean(t_cc_3seb))
+# print("T_S mean:", np.nanmean(t_s_3seb))
+# print("T_AC mean:", np.nanmean(t_ac_3seb))
+# print("R_x mean:", np.nanmean(r_x_3seb))
+# print("R_S mean:", np.nanmean(r_s_3seb))
+
+# print("f_g_sub mean:", np.mean(f_g_sub))

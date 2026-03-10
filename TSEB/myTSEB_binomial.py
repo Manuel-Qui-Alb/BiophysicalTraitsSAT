@@ -454,7 +454,7 @@ problem = {
         [0.2, 5],  # 1. LAI
         [0.25, 1], # 2. k_fc respect to LAI: f(LAI) * fv_var [0.01, 1]
         [1, 5],  # 3. h_V (m)
-        [2, 8],  # 4. row_sep (m)
+        [2, 4],  # 4. row_sep (m)
         [0.5, 1.5],  # 5. x_LAD
         [0, 180], # 6. phi_degrees
         [0.005, 0.2],  # 7. leaf_width (NOT DEFINED in screenshot - fill if needed) (m)
